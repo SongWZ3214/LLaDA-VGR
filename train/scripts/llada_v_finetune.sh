@@ -7,7 +7,11 @@ export NCCL_DEBUG_SUBSYS=ALL
 
 num_node=$1
 gpu_num=$2
-# in our case, we use 1 node and 4 gpus
+
+# need to change num_node and gpu_num! 
+# Configuration note: This script is typically run with 4 nodes and 8 GPUs per node.
+# The gradient_accumulation_steps should be adjusted based on your GPU count to maintain effective batch size.
+# For example, with 8 GPUs, set gradient_accumulation_steps=8.
 
 MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
 MASTER_PORT=${MASTER_PORT:-"29199"}
@@ -19,16 +23,16 @@ echo "node_rank ${RANK}"
 echo "gpu_num ${gpu_num}"
 echo "num_node ${num_node}"
 
-LLM_VERSION="model/LLaDA-8B-Instruct-HF/"
-
+LLM_VERSION="GSAI-ML/LLaDA-V"
 LLM_VERSION_CLEAN="${LLM_VERSION//\//_}"
 VISION_MODEL_VERSION="model/siglip2-so400m-patch14-384"
 VISION_MODEL_VERSION_CLEAN="${VISION_MODEL_VERSION//\//_}"
-############### Pretrain ################
 
-PROMPT_VERSION=llada_plain
+############### Finetune ################
 
-BASE_RUN_NAME="llada_v_pretrain"
+PROMPT_VERSION="llava_llada"
+
+BASE_RUN_NAME="llada_v_finetune"
 echo "BASE_RUN_NAME: ${BASE_RUN_NAME}"
 
 ACCELERATE_CPU_AFFINITY=1 torchrun --nproc_per_node=${gpu_num} --nnodes=${num_node} --master_addr=${MASTER_ADDR} --master_port ${MASTER_PORT} --node_rank=${RANK} \
@@ -36,24 +40,32 @@ ACCELERATE_CPU_AFFINITY=1 torchrun --nproc_per_node=${gpu_num} --nnodes=${num_no
     --deepspeed scripts/zero3.json \
     --model_name_or_path ${LLM_VERSION} \
     --version ${PROMPT_VERSION} \
-    --data_path "data/llava_pretrain/blip_laion_cc_sbu_558k.json" \
-    --image_folder "data/llava_pretrain/images" \
+    --data_path "" \
+    --image_folder "" \
+    --video_folder "" \
+    --mm_tunable_parts="mm_vision_tower,mm_mlp_adapter,mm_language_model" \
+    --mm_vision_tower_lr=2e-6 \
     --vision_tower ${VISION_MODEL_VERSION} \
-    --mm_tunable_parts="mm_mlp_adapter" \
-    --mm_vision_select_layer -2 \
     --mm_projector_type mlp2x_gelu \
+    --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
+    --group_by_modality_length True \
+    --image_aspect_ratio anyres_max_4 \
+    --image_grid_pinpoints "(1x1),...,(6x6)" \
+    --mm_patch_merge_type spatial_unpad \
     --bf16 True \
+    --run_name $BASE_RUN_NAME \
     --output_dir "exp/$BASE_RUN_NAME" \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 16 \
+    --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 4 \
-    --gradient_accumulation_steps 1 \
+    --gradient_accumulation_steps 2 \
     --evaluation_strategy "no" \
-    --save_strategy "no" \
-    --save_steps 50000 \
-    --learning_rate 1e-3 \
+    --save_strategy "steps" \
+    --save_steps 5000 \
+    --save_total_limit 1 \
+    --learning_rate 1e-5 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type "cosine" \
@@ -61,8 +73,11 @@ ACCELERATE_CPU_AFFINITY=1 torchrun --nproc_per_node=${gpu_num} --nnodes=${num_no
     --tf32 True \
     --model_max_length 8192 \
     --gradient_checkpointing True \
-    --dataloader_num_workers 16 \
+    --dataloader_num_workers 0 \
     --lazy_preprocess True \
     --report_to tensorboard \
-    --run_name $BASE_RUN_NAME \
-    --attn_implementation sdpa
+    --torch_compile True \
+    --torch_compile_backend "inductor" \
+    --dataloader_drop_last True \
+    --attn_implementation sdpa \
+    --use_conversation_mask False

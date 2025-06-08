@@ -31,7 +31,7 @@ The [LLaDA-V model](https://huggingface.co/GSAI-ML/LLaDA-V) is now available on 
    python generate_demo.py
    ```
 
-## Training
+## Training from LLaDA
 This repository includes a complete training framework for LLaDA-V, following the [LLaVA](https://github.com/haotian-liu/LLaVA) approach for visual instruction tuning. 
 
 ## Data Preparation
@@ -79,10 +79,17 @@ As an example, we outlined the data preparation process for training LLaDA-V usi
 ### Run Scripts
 ```bash
 Pretrain Script:
-    cd train && bash scripts/llada_v_pretrain.sh
+    cd train && bash scripts/train_from_scrach/llada_v_pretrain.sh
 
 Finetune Script:
-    cd train && bash scripts/llada_v_sft.sh
+    cd train && bash scripts/train_from_scrach/llada_v_sft.sh
+```
+
+## Finetune from LLaDA-V
+```bash
+Script: 
+   cd train && bash scripts/llada_v_finetune.sh
+   note: you need to add the path of "data_path", "image_folder", "video_folder" in llada_v_finetune.sh.
 ```
 
 ## Evaluation

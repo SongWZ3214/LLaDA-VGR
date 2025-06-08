@@ -8,6 +8,7 @@ export NCCL_DEBUG_SUBSYS=ALL
 num_node=$1
 gpu_num=$2
 
+# need to change num_node and gpu_num! 
 # Configuration note: This script is typically run with 4 nodes and 8 GPUs per node.
 # The gradient_accumulation_steps should be adjusted based on your GPU count to maintain effective batch size.
 # For example, with 8 GPUs, set gradient_accumulation_steps=8.
