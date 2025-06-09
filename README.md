@@ -34,7 +34,7 @@ The [LLaDA-V model](https://huggingface.co/GSAI-ML/LLaDA-V) is now available on 
 ## Training from LLaDA
 This repository includes a complete training framework for LLaDA-V, following the [LLaVA](https://github.com/haotian-liu/LLaVA) approach for visual instruction tuning. 
 
-## Data Preparation
+### Data Preparation
 As an example, we outlined the data preparation process for training LLaDA-V using the LLaVA-NeXT dataset. You need to prepare the following datasets:
 
 1. Download the LLaVA pretraining dataset from Hugging Face:
@@ -131,6 +131,7 @@ Script:
    cd train && bash scripts/llada_v_finetune.sh
    note: you need to add the path of "data_path", "image_folder", "video_folder" in llada_v_finetune.sh.
 ```
+
 
 ## Evaluation
 We provide the evaluation code in this repository, following the [lmms-eval](https://github.com/EvolvingLMMs-Lab/lmms-eval) library. 
