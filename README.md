@@ -55,6 +55,30 @@ As an example, we outlined the data preparation process for training LLaDA-V usi
    - Extract all tar.gz files (from llava_next_raw_format_images_1.tar.gz to llava_next_raw_format_images_11.tar.gz) from the llava_next_raw_format folder into train/data/llava_next/images
    - Move the llava_next_raw_format_processed.json file to train/data/llava_next/
 
+Further, if you want to reproduce the results of LLaDA-V, you need to further prepare the following datasets:
+1. Download the MAmmoTH-VL dataset from Hugging Face:
+   ```
+   https://huggingface.co/datasets/MAmmoTH-VL/MAmmoTH-VL-Instruct-12M/
+   ```
+2. Process the MAmmoTH-VL dataset by following these steps:
+   - Extract contents from multi_image_data and single_image_data folders to train/data/mammoth-vl/images
+   - Extract contents from video_data folder to train/data/mammoth-vl/videos
+   - Move the mammoth_si_10M.json file to train/data/mammoth-vl/mammoth_si_10M.json
+   - Move the mammoth_ov_2M.json file to train/data/mammoth-vl/mammoth_ov_2M.json
+   
+3. Download TIGER-Lab/VisualWebInstruct from Hugging Face:
+   ```
+   https://huggingface.co/datasets/TIGER-Lab/VisualWebInstruct
+   ```
+4. Process the TIGER-Lab/VisualWebInstruct dataset by following these steps:
+   - Extract images.zip to train/data/visualwebinstruct/images
+   - Convert the VisualWebInstruct dataset from JSON Lines format (mixed_conversation.jsonl) to standard JSON format (mixed_conversation.json)
+   - Move mixed_conversation.json file to train/data/visualwebinstruct/mixed_conversation.json
+5. Create the mix dataset by running:
+   ```bash
+   python create_mix_data.py --normal_data train/data/mammoth-vl/mammoth_ov_2M.json --inference_data train/data/visualwebinstruct/mixed_conversation.json --output_path train/data/mix_ov_2M_vw_reasoning.json
+   ```
+
 ### Model Preparation
 
 1. Download the pretrained LLaDA-8B-Instruct model from Hugging Face to the `train/model/LLaDA-8B-Instruct` directory:
@@ -76,13 +100,29 @@ As an example, we outlined the data preparation process for training LLaDA-V usi
    https://huggingface.co/google/siglip2-so400m-patch14-384
    ```
 
-### Run Scripts
+### Run Scripts for training on LLaVA-NeXT
 ```bash
 Pretrain Script:
-    cd train && bash scripts/train_from_scrach/llada_v_pretrain.sh
+   cd train && bash scripts/llada_v_pretrain.sh
 
 Finetune Script:
-    cd train && bash scripts/train_from_scrach/llada_v_sft.sh
+   cd train && bash scripts/train_ablation/llada_v_sft.sh
+```
+
+### Run Scripts for training LLaDA-V on MAmmoTH-VL
+```bash
+Pretrain Script:
+   cd train && bash scripts/llada_v_pretrain.sh
+
+Stage 2 Script:
+   cd train && bash scripts/train_llada_v/llada_v_si_10M.sh
+
+   cd train && bash scripts/train_llada_v/llada_v_ov_2M.sh
+
+Stage 3 Script:
+   cd train && bash scripts/train_llada_v/llada_v_vw.sh
+
+   cd train && bash scripts/train_llada_v/llada_v_mix_ov_vw.sh
 ```
 
 ## Finetune from LLaDA-V
