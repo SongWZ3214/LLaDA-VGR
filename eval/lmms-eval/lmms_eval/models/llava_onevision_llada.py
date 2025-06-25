@@ -8,7 +8,7 @@ from datetime import timedelta
 from typing import List, Optional, Tuple, Union
 import torch
 import torch.nn.functional as F
-
+import time
 import numpy as np
 import PIL
 import torch
@@ -91,6 +91,7 @@ class Llava_OneVision_LLaDA(lmms):
         mc_num: Optional[int] = 128,
         batch_size_ppl: Optional[int] = 32,
         is_check_greedy: Optional[bool] = True,
+        use_fast_dllm: Optional[bool] = False,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -150,6 +151,12 @@ class Llava_OneVision_LLaDA(lmms):
 
         self._config = self._model.config
         self.model.eval()
+
+        if use_fast_dllm:
+            print("Using fast dLLM hook")
+            from llava.hooks.fast_dllm_hook import register_fast_dllm_hook
+            register_fast_dllm_hook(self.model)
+
         self.truncation = truncation
         self.batch_size_per_gpu = int(batch_size)
         self.conv_template = conv_template
@@ -437,7 +444,9 @@ class Llava_OneVision_LLaDA(lmms):
         pbar = tqdm(total=num_iters, disable=(self.rank != 0), desc="Model Responding")
 
         origin_image_aspect_ratio = getattr(self._config, "image_aspect_ratio", None)
+        num_tokens = 0
 
+        start_time = time.time()
         for chunk in chunks:
             batched_contexts, all_gen_kwargs, batched_doc_to_visual, batched_doc_id, batched_task, batched_split = zip(*chunk)
             task = batched_task[0]
@@ -621,6 +630,8 @@ class Llava_OneVision_LLaDA(lmms):
 
                 text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)
                 text_outputs = [output[:-1] if output.endswith('.') else output for output in text_outputs]
+                num_tokens += (cont != self.tokenizer.eos_token_id).sum()
+
                 print(text_outputs)
                 print('--------------------------------')
             except Exception as e:
@@ -632,7 +643,10 @@ class Llava_OneVision_LLaDA(lmms):
             pbar.update(1)
             # reorder this group of results back to original unsorted form
         res = re_ords.get_original(res)
-
+        end_time = time.time()
+        print(f"Time taken: {end_time - start_time} seconds")
+        print(f"Tokens per second: {num_tokens / (end_time - start_time)}")
+        print(f"Total number of tokens: {num_tokens}")
         pbar.close()
         return res
 
