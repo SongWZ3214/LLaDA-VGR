@@ -4,6 +4,7 @@
 
 
 ## News
+- [2025.06.30] [Fast-dLLM](https://github.com/NVlabs/Fast-dLLM) is now supported in LLaDA-V! This integration accelerates inference latency from 60s to just 6s. Try it out [here](https://github.com/ML-GSAI/LLaDA-V/blob/main/train/generate_demo.py)! 
 - [2025.05.29] We open-sourced the model [LLaDA-V](https://huggingface.co/GSAI-ML/LLaDA-V) and the code of LLaDA-V.
 - [2025.05.23] We have uploaded our paper to [arXiv](https://arxiv.org/abs/2505.16933).
 
@@ -157,7 +158,9 @@ If you have any questions, please feel free to contact us at zebin@ruc.edu.cn.
 
 
 ## Acknowledgments
-The code is largely based on the [LLaVA-NeXT](https://github.com/LLaVA-VL/LLaVA-NeXT), [MAmmoTH-VL](https://github.com/MAmmoTH-VL/MAmmoTH-VL), [lmms-eval](https://github.com/EvolvingLMMs-Lab/lmms-eval) and [dLLM-cache](https://github.com/maomaocun/dLLM-cache/tree/main). We thank the authors for their great work. We are also very grateful to Chengyue for helping us adapt [Fast-dLLM](https://github.com/NVlabs/Fast-dLLM), which accelerates the generation process.
+The code is largely based on the [LLaVA-NeXT](https://github.com/LLaVA-VL/LLaVA-NeXT), [MAmmoTH-VL](https://github.com/MAmmoTH-VL/MAmmoTH-VL), [lmms-eval](https://github.com/EvolvingLMMs-Lab/lmms-eval) and [dLLM-cache](https://github.com/maomaocun/dLLM-cache/tree/main). We thank the authors for their great work. 
+
+We are also very grateful to Chengyue for helping us adapt [Fast-dLLM](https://github.com/NVlabs/Fast-dLLM), which significantly accelerates the generation process.
 
 ## Citation
 
