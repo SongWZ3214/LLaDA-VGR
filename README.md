@@ -157,7 +157,7 @@ If you have any questions, please feel free to contact us at zebin@ruc.edu.cn.
 
 
 ## Acknowledgments
-The code is largely based on the [LLaVA-NeXT](https://github.com/LLaVA-VL/LLaVA-NeXT), [MAmmoTH-VL](https://github.com/MAmmoTH-VL/MAmmoTH-VL), [lmms-eval](https://github.com/EvolvingLMMs-Lab/lmms-eval) and [dLLM-cache](https://github.com/maomaocun/dLLM-cache/tree/main). We thank the authors for their great work.
+The code is largely based on the [LLaVA-NeXT](https://github.com/LLaVA-VL/LLaVA-NeXT), [MAmmoTH-VL](https://github.com/MAmmoTH-VL/MAmmoTH-VL), [lmms-eval](https://github.com/EvolvingLMMs-Lab/lmms-eval) and [dLLM-cache](https://github.com/maomaocun/dLLM-cache/tree/main). We thank the authors for their great work. We are also very grateful to Chengyue for helping us adapt [Fast-dLLM](https://github.com/NVlabs/Fast-dLLM), which accelerates the generation process.
 
 ## Citation
 
