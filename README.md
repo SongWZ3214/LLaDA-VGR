@@ -162,6 +162,14 @@ The code is largely based on the [LLaVA-NeXT](https://github.com/LLaVA-VL/LLaVA-
 
 We are also very grateful to Chengyue for helping us adapt [Fast-dLLM](https://github.com/NVlabs/Fast-dLLM), which significantly accelerates the generation process.
 
+## Discussion
+
+Feel free to scan the WeChat QR code below to participate in the discussion and stay updated with the latest progress.
+
+<div style="display: flex; justify-content: center; flex-wrap: wrap;">
+    <img src="vx.jpg" style="width: 50%" />
+</div>
+
 ## Citation
 
 ```bibtex
