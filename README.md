@@ -167,7 +167,7 @@ We are also very grateful to Chengyue for helping us adapt [Fast-dLLM](https://g
 Feel free to scan the WeChat QR code below to participate in the discussion and stay updated with the latest progress.
 
 <div style="display: flex; justify-content: center; flex-wrap: wrap;">
-    <img src="vx.jpg" style="width: 50%" />
+    <img src="https://github.com/ML-GSAI/LLaDA/blob/main/imgs/QR.jpg" style="width: 50%" />
 </div>
 
 ## Citation
