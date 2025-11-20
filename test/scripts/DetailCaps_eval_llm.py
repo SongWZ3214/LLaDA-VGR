@@ -29,11 +29,11 @@ class ResultList(TypedDict):
 
 # 初始化 OpenAI 客户端
 # 请确保设置了 OPENAI_API_KEY 环境变量
-OPENAI_API_KEY = "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"
+OPENAI_API_KEY = "OPENAI_API_KEY"
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 # 初始化 Gemini 客户端（如果可用）
-GEMINI_API_KEY = "AIzaSyDhLOePL0qFXgR3eLU6rpQGN-_Dyei_0rY"  # 请在此处填入您的 Gemini API 密钥
+GEMINI_API_KEY = "GEMINI_API_KEY"  # 请在此处填入您的 Gemini API 密钥
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
 def load_parquet_data(parquet_path: str) -> pd.DataFrame:
