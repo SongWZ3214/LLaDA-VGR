@@ -1,0 +1,838 @@
+{
+  "index": 6,
+  "num_tokens": 128,
+  "jitter_values": {
+    "0": {
+      "jitter": 0.024791479110717773,
+      "token_text": "The"
+    },
+    "1": {
+      "jitter": 0.000148773193359375,
+      "token_text": " image"
+    },
+    "2": {
+      "jitter": 0.22734981775283813,
+      "token_text": " captures"
+    },
+    "3": {
+      "jitter": 0.007285475730895996,
+      "token_text": " a"
+    },
+    "4": {
+      "jitter": 0.1375676989555359,
+      "token_text": " vibrant"
+    },
+    "5": {
+      "jitter": 0.0,
+      "token_text": " scene"
+    },
+    "6": {
+      "jitter": 0.1517113447189331,
+      "token_text": " of"
+    },
+    "7": {
+      "jitter": 0.16655437648296356,
+      "token_text": " fresh"
+    },
+    "8": {
+      "jitter": 0.06960329413414001,
+      "token_text": " fruits"
+    },
+    "9": {
+      "jitter": 0.08156220614910126,
+      "token_text": "."
+    },
+    "10": {
+      "jitter": 0.006589710712432861,
+      "token_text": " There"
+    },
+    "11": {
+      "jitter": 0.1877203732728958,
+      "token_text": " are"
+    },
+    "12": {
+      "jitter": 0.7549970149993896,
+      "token_text": " six"
+    },
+    "13": {
+      "jitter": 0.28856261074543,
+      "token_text": " oranges"
+    },
+    "14": {
+      "jitter": 0.05462241172790527,
+      "token_text": " and"
+    },
+    "15": {
+      "jitter": 0.1675213724374771,
+      "token_text": " two"
+    },
+    "16": {
+      "jitter": 0.0890326201915741,
+      "token_text": " apples"
+    },
+    "17": {
+      "jitter": 0.05826331675052643,
+      "token_text": ","
+    },
+    "18": {
+      "jitter": 0.09508335590362549,
+      "token_text": " all"
+    },
+    "19": {
+      "jitter": 0.19037848711013794,
+      "token_text": " arranged"
+    },
+    "20": {
+      "jitter": 0.2124716192483902,
+      "token_text": " on"
+    },
+    "21": {
+      "jitter": 0.13925862312316895,
+      "token_text": " a"
+    },
+    "22": {
+      "jitter": 0.2229321002960205,
+      "token_text": " white"
+    },
+    "23": {
+      "jitter": 0.23605400323867798,
+      "token_text": " background"
+    },
+    "24": {
+      "jitter": 0.08031202852725983,
+      "token_text": "."
+    },
+    "25": {
+      "jitter": 0.08914189040660858,
+      "token_text": " The"
+    },
+    "26": {
+      "jitter": 0.053588539361953735,
+      "token_text": " oranges"
+    },
+    "27": {
+      "jitter": 0.17013296484947205,
+      "token_text": ","
+    },
+    "28": {
+      "jitter": 0.08299754559993744,
+      "token_text": " with"
+    },
+    "29": {
+      "jitter": 0.0905114933848381,
+      "token_text": " their"
+    },
+    "30": {
+      "jitter": 0.19772671163082123,
+      "token_text": " bright"
+    },
+    "31": {
+      "jitter": 0.14172875881195068,
+      "token_text": " orange"
+    },
+    "32": {
+      "jitter": 0.6053339540958405,
+      "token_text": " color"
+    },
+    "33": {
+      "jitter": 0.07760295271873474,
+      "token_text": ","
+    },
+    "34": {
+      "jitter": 0.272797554731369,
+      "token_text": " are"
+    },
+    "35": {
+      "jitter": 0.22315922379493713,
+      "token_text": " positioned"
+    },
+    "36": {
+      "jitter": 0.148634135723114,
+      "token_text": " in"
+    },
+    "37": {
+      "jitter": 0.19952555000782013,
+      "token_text": " a"
+    },
+    "38": {
+      "jitter": 0.11035697162151337,
+      "token_text": " semi"
+    },
+    "39": {
+      "jitter": 0.13970114290714264,
+      "token_text": "-circle"
+    },
+    "40": {
+      "jitter": 0.24363315105438232,
+      "token_text": " formation"
+    },
+    "41": {
+      "jitter": 0.3452220559120178,
+      "token_text": ","
+    },
+    "42": {
+      "jitter": 0.1863306611776352,
+      "token_text": " creating"
+    },
+    "43": {
+      "jitter": 0.11579546332359314,
+      "token_text": " a"
+    },
+    "44": {
+      "jitter": 0.1801418960094452,
+      "token_text": " sense"
+    },
+    "45": {
+      "jitter": 0.10770587623119354,
+      "token_text": " of"
+    },
+    "46": {
+      "jitter": 0.5972695797681808,
+      "token_text": " symmetry"
+    },
+    "47": {
+      "jitter": 0.08581806719303131,
+      "token_text": "."
+    },
+    "48": {
+      "jitter": 0.13779035210609436,
+      "token_text": " The"
+    },
+    "49": {
+      "jitter": 0.13931603729724884,
+      "token_text": " apples"
+    },
+    "50": {
+      "jitter": 0.10433852672576904,
+      "token_text": ","
+    },
+    "51": {
+      "jitter": 0.12089912593364716,
+      "token_text": " with"
+    },
+    "52": {
+      "jitter": 0.12033310532569885,
+      "token_text": " their"
+    },
+    "53": {
+      "jitter": 0.7489191591739655,
+      "token_text": " rich"
+    },
+    "54": {
+      "jitter": 0.10171735286712646,
+      "token_text": " red"
+    },
+    "55": {
+      "jitter": 0.20382064580917358,
+      "token_text": " color"
+    },
+    "56": {
+      "jitter": 0.1287582963705063,
+      "token_text": ","
+    },
+    "57": {
+      "jitter": 0.1471988707780838,
+      "token_text": " are"
+    },
+    "58": {
+      "jitter": 0.28308722376823425,
+      "token_text": " placed"
+    },
+    "59": {
+      "jitter": 0.7244117110967636,
+      "token_text": " at"
+    },
+    "60": {
+      "jitter": 0.09941460192203522,
+      "token_text": " the"
+    },
+    "61": {
+      "jitter": 0.386400431394577,
+      "token_text": " ends"
+    },
+    "62": {
+      "jitter": 0.11077502369880676,
+      "token_text": " of"
+    },
+    "63": {
+      "jitter": 0.11823119223117828,
+      "token_text": " the"
+    },
+    "64": {
+      "jitter": 0.08476866781711578,
+      "token_text": " semi"
+    },
+    "65": {
+      "jitter": 0.10364335775375366,
+      "token_text": "-circle"
+    },
+    "66": {
+      "jitter": 0.11581529676914215,
+      "token_text": ","
+    },
+    "67": {
+      "jitter": 0.12869448959827423,
+      "token_text": " adding"
+    },
+    "68": {
+      "jitter": 0.14023415744304657,
+      "token_text": " a"
+    },
+    "69": {
+      "jitter": 0.37267057597637177,
+      "token_text": " pop"
+    },
+    "70": {
+      "jitter": 0.10855114459991455,
+      "token_text": " of"
+    },
+    "71": {
+      "jitter": 0.5105359554290771,
+      "token_text": " color"
+    },
+    "72": {
+      "jitter": 0.08539044857025146,
+      "token_text": " to"
+    },
+    "73": {
+      "jitter": 0.08747710287570953,
+      "token_text": " the"
+    },
+    "74": {
+      "jitter": 0.4051962196826935,
+      "token_text": " arrangement"
+    },
+    "75": {
+      "jitter": 0.09845981001853943,
+      "token_text": "."
+    },
+    "76": {
+      "jitter": 0.09861686825752258,
+      "token_text": " The"
+    },
+    "77": {
+      "jitter": 0.5695232599973679,
+      "token_text": " fruits"
+    },
+    "78": {
+      "jitter": 0.1099977046251297,
+      "token_text": " are"
+    },
+    "79": {
+      "jitter": 0.25801795721054077,
+      "token_text": " arranged"
+    },
+    "80": {
+      "jitter": 0.21949502825737,
+      "token_text": " in"
+    },
+    "81": {
+      "jitter": 0.22336232662200928,
+      "token_text": " such"
+    },
+    "82": {
+      "jitter": 0.11789843440055847,
+      "token_text": " a"
+    },
+    "83": {
+      "jitter": 0.09289619326591492,
+      "token_text": " way"
+    },
+    "84": {
+      "jitter": 0.0779246985912323,
+      "token_text": " that"
+    },
+    "85": {
+      "jitter": 0.3302964121103287,
+      "token_text": " they"
+    },
+    "86": {
+      "jitter": 0.18658481538295746,
+      "token_text": " form"
+    },
+    "87": {
+      "jitter": 0.16535288095474243,
+      "token_text": " a"
+    },
+    "88": {
+      "jitter": 0.20634255558252335,
+      "token_text": " semi"
+    },
+    "89": {
+      "jitter": 0.5640580058097839,
+      "token_text": "-circle"
+    },
+    "90": {
+      "jitter": 0.13792194426059723,
+      "token_text": ","
+    },
+    "91": {
+      "jitter": 0.15403760969638824,
+      "token_text": " with"
+    },
+    "92": {
+      "jitter": 0.16348280012607574,
+      "token_text": " the"
+    },
+    "93": {
+      "jitter": 0.1397365927696228,
+      "token_text": " oranges"
+    },
+    "94": {
+      "jitter": 0.1664465218782425,
+      "token_text": " in"
+    },
+    "95": {
+      "jitter": 0.2101753205060959,
+      "token_text": " the"
+    },
+    "96": {
+      "jitter": 0.35483822226524353,
+      "token_text": " middle"
+    },
+    "97": {
+      "jitter": 0.2363302856683731,
+      "token_text": " and"
+    },
+    "98": {
+      "jitter": 0.12957413494586945,
+      "token_text": " the"
+    },
+    "99": {
+      "jitter": 0.10517537593841553,
+      "token_text": " apples"
+    },
+    "100": {
+      "jitter": 0.11347508430480957,
+      "token_text": " at"
+    },
+    "101": {
+      "jitter": 0.12309780716896057,
+      "token_text": " the"
+    },
+    "102": {
+      "jitter": 0.10765795409679413,
+      "token_text": " ends"
+    },
+    "103": {
+      "jitter": 0.14622429013252258,
+      "token_text": "."
+    },
+    "104": {
+      "jitter": 0.10310295224189758,
+      "token_text": " The"
+    },
+    "105": {
+      "jitter": 0.3489760309457779,
+      "token_text": " relative"
+    },
+    "106": {
+      "jitter": 0.4750673174858093,
+      "token_text": " positions"
+    },
+    "107": {
+      "jitter": 0.1145801693201065,
+      "token_text": " of"
+    },
+    "108": {
+      "jitter": 0.14428861439228058,
+      "token_text": " the"
+    },
+    "109": {
+      "jitter": 0.20607510209083557,
+      "token_text": " fruits"
+    },
+    "110": {
+      "jitter": 0.7559550404548645,
+      "token_text": " are"
+    },
+    "111": {
+      "jitter": 1.5604171305894852,
+      "token_text": " evenly"
+    },
+    "112": {
+      "jitter": 1.2846191823482513,
+      "token_text": " spaced"
+    },
+    "113": {
+      "jitter": 1.0113423615694046,
+      "token_text": " within"
+    },
+    "114": {
+      "jitter": 0.4154365509748459,
+      "token_text": " the"
+    },
+    "115": {
+      "jitter": 0.8414285480976105,
+      "token_text": " semi"
+    },
+    "116": {
+      "jitter": 0.5496425032615662,
+      "token_text": "-circle"
+    },
+    "117": {
+      "jitter": 0.18701373040676117,
+      "token_text": ","
+    },
+    "118": {
+      "jitter": 0.3928516358137131,
+      "token_text": " contributing"
+    },
+    "119": {
+      "jitter": 0.19292724132537842,
+      "token_text": " to"
+    },
+    "120": {
+      "jitter": 0.24188099801540375,
+      "token_text": " the"
+    },
+    "121": {
+      "jitter": 0.16594445705413818,
+      "token_text": " overall"
+    },
+    "122": {
+      "jitter": 0.6507525891065598,
+      "token_text": " composition"
+    },
+    "123": {
+      "jitter": 0.2539951801300049,
+      "token_text": " of"
+    },
+    "124": {
+      "jitter": 0.41569289565086365,
+      "token_text": " the"
+    },
+    "125": {
+      "jitter": 0.48964881896972656,
+      "token_text": " image"
+    },
+    "126": {
+      "jitter": 0.0,
+      "token_text": "."
+    },
+    "127": {
+      "jitter": 0.0,
+      "token_text": "<|eot_id|>"
+    }
+  },
+  "inconsistent_token": [
+    {
+      "token_id": 12,
+      "token_text": " six"
+    },
+    {
+      "token_id": 13,
+      "token_text": " oranges"
+    },
+    {
+      "token_id": 35,
+      "token_text": " positioned"
+    },
+    {
+      "token_id": 36,
+      "token_text": " in"
+    },
+    {
+      "token_id": 37,
+      "token_text": " a"
+    },
+    {
+      "token_id": 38,
+      "token_text": " semi"
+    },
+    {
+      "token_id": 39,
+      "token_text": "-circle"
+    },
+    {
+      "token_id": 40,
+      "token_text": " formation"
+    },
+    {
+      "token_id": 42,
+      "token_text": " creating"
+    },
+    {
+      "token_id": 43,
+      "token_text": " a"
+    },
+    {
+      "token_id": 44,
+      "token_text": " sense"
+    },
+    {
+      "token_id": 45,
+      "token_text": " of"
+    },
+    {
+      "token_id": 46,
+      "token_text": " symmetry"
+    },
+    {
+      "token_id": 52,
+      "token_text": " their"
+    },
+    {
+      "token_id": 53,
+      "token_text": " rich"
+    },
+    {
+      "token_id": 54,
+      "token_text": " red"
+    },
+    {
+      "token_id": 55,
+      "token_text": " color"
+    },
+    {
+      "token_id": 58,
+      "token_text": " placed"
+    },
+    {
+      "token_id": 59,
+      "token_text": " at"
+    },
+    {
+      "token_id": 60,
+      "token_text": " the"
+    },
+    {
+      "token_id": 61,
+      "token_text": " ends"
+    },
+    {
+      "token_id": 62,
+      "token_text": " of"
+    },
+    {
+      "token_id": 63,
+      "token_text": " the"
+    },
+    {
+      "token_id": 64,
+      "token_text": " semi"
+    },
+    {
+      "token_id": 65,
+      "token_text": "-circle"
+    },
+    {
+      "token_id": 86,
+      "token_text": " form"
+    },
+    {
+      "token_id": 87,
+      "token_text": " a"
+    },
+    {
+      "token_id": 88,
+      "token_text": " semi"
+    },
+    {
+      "token_id": 89,
+      "token_text": "-circle"
+    },
+    {
+      "token_id": 91,
+      "token_text": " with"
+    },
+    {
+      "token_id": 92,
+      "token_text": " the"
+    },
+    {
+      "token_id": 93,
+      "token_text": " oranges"
+    },
+    {
+      "token_id": 94,
+      "token_text": " in"
+    },
+    {
+      "token_id": 95,
+      "token_text": " the"
+    },
+    {
+      "token_id": 96,
+      "token_text": " middle"
+    },
+    {
+      "token_id": 97,
+      "token_text": " and"
+    },
+    {
+      "token_id": 98,
+      "token_text": " the"
+    },
+    {
+      "token_id": 99,
+      "token_text": " apples"
+    },
+    {
+      "token_id": 100,
+      "token_text": " at"
+    },
+    {
+      "token_id": 101,
+      "token_text": " the"
+    },
+    {
+      "token_id": 102,
+      "token_text": " ends"
+    },
+    {
+      "token_id": 111,
+      "token_text": " evenly"
+    },
+    {
+      "token_id": 112,
+      "token_text": " spaced"
+    },
+    {
+      "token_id": 113,
+      "token_text": " within"
+    },
+    {
+      "token_id": 114,
+      "token_text": " the"
+    },
+    {
+      "token_id": 115,
+      "token_text": " semi"
+    },
+    {
+      "token_id": 116,
+      "token_text": "-circle"
+    }
+  ],
+  "fine_grained_token": [
+    {
+      "token_id": 4,
+      "token_text": " vibrant"
+    },
+    {
+      "token_id": 5,
+      "token_text": " scene"
+    },
+    {
+      "token_id": 6,
+      "token_text": " of"
+    },
+    {
+      "token_id": 7,
+      "token_text": " fresh"
+    },
+    {
+      "token_id": 8,
+      "token_text": " fruits"
+    },
+    {
+      "token_id": 18,
+      "token_text": " all"
+    },
+    {
+      "token_id": 19,
+      "token_text": " arranged"
+    },
+    {
+      "token_id": 20,
+      "token_text": " on"
+    },
+    {
+      "token_id": 21,
+      "token_text": " a"
+    },
+    {
+      "token_id": 22,
+      "token_text": " white"
+    },
+    {
+      "token_id": 23,
+      "token_text": " background"
+    },
+    {
+      "token_id": 30,
+      "token_text": " bright"
+    },
+    {
+      "token_id": 31,
+      "token_text": " orange"
+    },
+    {
+      "token_id": 32,
+      "token_text": " color"
+    },
+    {
+      "token_id": 67,
+      "token_text": " adding"
+    },
+    {
+      "token_id": 68,
+      "token_text": " a"
+    },
+    {
+      "token_id": 69,
+      "token_text": " pop"
+    },
+    {
+      "token_id": 70,
+      "token_text": " of"
+    },
+    {
+      "token_id": 71,
+      "token_text": " color"
+    },
+    {
+      "token_id": 72,
+      "token_text": " to"
+    },
+    {
+      "token_id": 73,
+      "token_text": " the"
+    },
+    {
+      "token_id": 74,
+      "token_text": " arrangement"
+    },
+    {
+      "token_id": 118,
+      "token_text": " contributing"
+    },
+    {
+      "token_id": 119,
+      "token_text": " to"
+    },
+    {
+      "token_id": 120,
+      "token_text": " the"
+    },
+    {
+      "token_id": 121,
+      "token_text": " overall"
+    },
+    {
+      "token_id": 122,
+      "token_text": " composition"
+    },
+    {
+      "token_id": 123,
+      "token_text": " of"
+    },
+    {
+      "token_id": 124,
+      "token_text": " the"
+    },
+    {
+      "token_id": 125,
+      "token_text": " image"
+    }
+  ],
+  "statistics": {
+    "all_tokens_mean": 0.2370489005697891,
+    "inconsistent_tokens_mean": 0.3227784679608142,
+    "fine_grained_tokens_mean": 0.24029494126637777,
+    "marked_tokens_mean": 0.29064202898895586,
+    "max_jitter": 1.5604171305894852,
+    "min_jitter": 0.0
+  }
+}

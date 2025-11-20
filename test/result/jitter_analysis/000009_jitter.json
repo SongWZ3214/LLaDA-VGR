@@ -1,0 +1,710 @@
+{
+  "index": 9,
+  "num_tokens": 128,
+  "jitter_values": {
+    "0": {
+      "jitter": 0.0,
+      "token_text": "The"
+    },
+    "1": {
+      "jitter": 0.0,
+      "token_text": " image"
+    },
+    "2": {
+      "jitter": 0.03689473867416382,
+      "token_text": " captures"
+    },
+    "3": {
+      "jitter": 0.004377484321594238,
+      "token_text": " a"
+    },
+    "4": {
+      "jitter": 0.0,
+      "token_text": " scene"
+    },
+    "5": {
+      "jitter": 0.050594866275787354,
+      "token_text": " of"
+    },
+    "6": {
+      "jitter": 0.037362128496170044,
+      "token_text": " a"
+    },
+    "7": {
+      "jitter": 0.3244634121656418,
+      "token_text": " fire"
+    },
+    "8": {
+      "jitter": 0.05184820294380188,
+      "token_text": " hyd"
+    },
+    "9": {
+      "jitter": 0.025302574038505554,
+      "token_text": "rant"
+    },
+    "10": {
+      "jitter": 0.04179683327674866,
+      "token_text": ","
+    },
+    "11": {
+      "jitter": 0.10803394019603729,
+      "token_text": " painted"
+    },
+    "12": {
+      "jitter": 0.07109497487545013,
+      "token_text": " in"
+    },
+    "13": {
+      "jitter": 0.05940161645412445,
+      "token_text": " a"
+    },
+    "14": {
+      "jitter": 0.12105332314968109,
+      "token_text": " vibrant"
+    },
+    "15": {
+      "jitter": 0.043660908937454224,
+      "token_text": " shade"
+    },
+    "16": {
+      "jitter": 0.021014705300331116,
+      "token_text": " of"
+    },
+    "17": {
+      "jitter": 0.0894385278224945,
+      "token_text": " orange"
+    },
+    "18": {
+      "jitter": 0.05526569485664368,
+      "token_text": ","
+    },
+    "19": {
+      "jitter": 0.09438881278038025,
+      "token_text": " standing"
+    },
+    "20": {
+      "jitter": 0.5185823440551758,
+      "token_text": " proudly"
+    },
+    "21": {
+      "jitter": 0.09207466244697571,
+      "token_text": " on"
+    },
+    "22": {
+      "jitter": 0.12179213762283325,
+      "token_text": " a"
+    },
+    "23": {
+      "jitter": 0.10206614434719086,
+      "token_text": " concrete"
+    },
+    "24": {
+      "jitter": 0.11064973473548889,
+      "token_text": " sidewalk"
+    },
+    "25": {
+      "jitter": 0.05657340586185455,
+      "token_text": "."
+    },
+    "26": {
+      "jitter": 0.05508847534656525,
+      "token_text": " The"
+    },
+    "27": {
+      "jitter": 0.04376327991485596,
+      "token_text": " hyd"
+    },
+    "28": {
+      "jitter": 0.05847613513469696,
+      "token_text": "rant"
+    },
+    "29": {
+      "jitter": 0.250760018825531,
+      "token_text": ","
+    },
+    "30": {
+      "jitter": 0.32197825610637665,
+      "token_text": " with"
+    },
+    "31": {
+      "jitter": 0.13729701936244965,
+      "token_text": " its"
+    },
+    "32": {
+      "jitter": 0.49581781029701233,
+      "token_text": " black"
+    },
+    "33": {
+      "jitter": 0.12683852016925812,
+      "token_text": " top"
+    },
+    "34": {
+      "jitter": 0.05799303948879242,
+      "token_text": " and"
+    },
+    "35": {
+      "jitter": 0.2272021621465683,
+      "token_text": " silver"
+    },
+    "36": {
+      "jitter": 0.19287125766277313,
+      "token_text": " chain"
+    },
+    "37": {
+      "jitter": 0.0690746158361435,
+      "token_text": ","
+    },
+    "38": {
+      "jitter": 0.051626138389110565,
+      "token_text": " is"
+    },
+    "39": {
+      "jitter": 0.23629780113697052,
+      "token_text": " positioned"
+    },
+    "40": {
+      "jitter": 0.18019722402095795,
+      "token_text": " near"
+    },
+    "41": {
+      "jitter": 0.13432469964027405,
+      "token_text": " a"
+    },
+    "42": {
+      "jitter": 0.12355359643697739,
+      "token_text": " stone"
+    },
+    "43": {
+      "jitter": 0.07114561647176743,
+      "token_text": " wall"
+    },
+    "44": {
+      "jitter": 0.0903787761926651,
+      "token_text": " that"
+    },
+    "45": {
+      "jitter": 0.17661688476800919,
+      "token_text": " adds"
+    },
+    "46": {
+      "jitter": 0.15760276466608047,
+      "token_text": " a"
+    },
+    "47": {
+      "jitter": 0.3130339905619621,
+      "token_text": " touch"
+    },
+    "48": {
+      "jitter": 0.0749005675315857,
+      "token_text": " of"
+    },
+    "49": {
+      "jitter": 0.39498140662908554,
+      "token_text": " elegance"
+    },
+    "50": {
+      "jitter": 0.055522918701171875,
+      "token_text": " to"
+    },
+    "51": {
+      "jitter": 0.055030591785907745,
+      "token_text": " the"
+    },
+    "52": {
+      "jitter": 0.1242380291223526,
+      "token_text": " scene"
+    },
+    "53": {
+      "jitter": 0.04028511047363281,
+      "token_text": "."
+    },
+    "54": {
+      "jitter": 0.19373103976249695,
+      "token_text": " In"
+    },
+    "55": {
+      "jitter": 0.07247432321310043,
+      "token_text": " the"
+    },
+    "56": {
+      "jitter": 0.08170661330223083,
+      "token_text": " background"
+    },
+    "57": {
+      "jitter": 0.11257466673851013,
+      "token_text": ","
+    },
+    "58": {
+      "jitter": 0.128013014793396,
+      "token_text": " a"
+    },
+    "59": {
+      "jitter": 0.31467026472091675,
+      "token_text": " lush"
+    },
+    "60": {
+      "jitter": 0.08002021908760071,
+      "token_text": " green"
+    },
+    "61": {
+      "jitter": 0.10523736476898193,
+      "token_text": " garden"
+    },
+    "62": {
+      "jitter": 0.4002026915550232,
+      "token_text": " can"
+    },
+    "63": {
+      "jitter": 0.3274475634098053,
+      "token_text": " be"
+    },
+    "64": {
+      "jitter": 0.499916672706604,
+      "token_text": " seen"
+    },
+    "65": {
+      "jitter": 0.31266412138938904,
+      "token_text": ","
+    },
+    "66": {
+      "jitter": 0.3141808807849884,
+      "token_text": " providing"
+    },
+    "67": {
+      "jitter": 0.2515183836221695,
+      "token_text": " a"
+    },
+    "68": {
+      "jitter": 0.40678878128528595,
+      "token_text": " refreshing"
+    },
+    "69": {
+      "jitter": 0.2786863446235657,
+      "token_text": " contrast"
+    },
+    "70": {
+      "jitter": 0.25823140144348145,
+      "token_text": " to"
+    },
+    "71": {
+      "jitter": 0.20519012212753296,
+      "token_text": " the"
+    },
+    "72": {
+      "jitter": 0.17173779010772705,
+      "token_text": " urban"
+    },
+    "73": {
+      "jitter": 0.24230769276618958,
+      "token_text": " setting"
+    },
+    "74": {
+      "jitter": 0.22633901238441467,
+      "token_text": "."
+    },
+    "75": {
+      "jitter": 0.23230651021003723,
+      "token_text": " A"
+    },
+    "76": {
+      "jitter": 0.3994498550891876,
+      "token_text": " building"
+    },
+    "77": {
+      "jitter": 0.26426663994789124,
+      "token_text": ","
+    },
+    "78": {
+      "jitter": 0.7670599222183228,
+      "token_text": " possibly"
+    },
+    "79": {
+      "jitter": 0.4059505835175514,
+      "token_text": " a"
+    },
+    "80": {
+      "jitter": 0.457765631377697,
+      "token_text": " residential"
+    },
+    "81": {
+      "jitter": 0.370817095041275,
+      "token_text": " or"
+    },
+    "82": {
+      "jitter": 0.42749692499637604,
+      "token_text": " commercial"
+    },
+    "83": {
+      "jitter": 0.4228252023458481,
+      "token_text": " establishment"
+    },
+    "84": {
+      "jitter": 0.2947935163974762,
+      "token_text": ","
+    },
+    "85": {
+      "jitter": 0.4026433974504471,
+      "token_text": " is"
+    },
+    "86": {
+      "jitter": 0.2692193388938904,
+      "token_text": " visible"
+    },
+    "87": {
+      "jitter": 0.3711865544319153,
+      "token_text": " on"
+    },
+    "88": {
+      "jitter": 0.17186780273914337,
+      "token_text": " the"
+    },
+    "89": {
+      "jitter": 0.46007028222084045,
+      "token_text": " right"
+    },
+    "90": {
+      "jitter": 0.2997308596968651,
+      "token_text": " side"
+    },
+    "91": {
+      "jitter": 0.1574854999780655,
+      "token_text": " of"
+    },
+    "92": {
+      "jitter": 0.15755508840084076,
+      "token_text": " the"
+    },
+    "93": {
+      "jitter": 0.4180182069540024,
+      "token_text": " image"
+    },
+    "94": {
+      "jitter": 0.16485204547643661,
+      "token_text": "."
+    },
+    "95": {
+      "jitter": 0.19814232736825943,
+      "token_text": " A"
+    },
+    "96": {
+      "jitter": 0.3047114834189415,
+      "token_text": " few"
+    },
+    "97": {
+      "jitter": 0.2829357832670212,
+      "token_text": " leaves"
+    },
+    "98": {
+      "jitter": 0.2901240736246109,
+      "token_text": " are"
+    },
+    "99": {
+      "jitter": 0.2704489678144455,
+      "token_text": " scattered"
+    },
+    "100": {
+      "jitter": 0.15246009826660156,
+      "token_text": " on"
+    },
+    "101": {
+      "jitter": 0.13484729826450348,
+      "token_text": " the"
+    },
+    "102": {
+      "jitter": 0.25758951902389526,
+      "token_text": " sidewalk"
+    },
+    "103": {
+      "jitter": 0.11649158596992493,
+      "token_text": ","
+    },
+    "104": {
+      "jitter": 0.1483372151851654,
+      "token_text": " adding"
+    },
+    "105": {
+      "jitter": 0.14697834849357605,
+      "token_text": " a"
+    },
+    "106": {
+      "jitter": 0.21274830400943756,
+      "token_text": " sense"
+    },
+    "107": {
+      "jitter": 0.1783466637134552,
+      "token_text": " of"
+    },
+    "108": {
+      "jitter": 0.681523010134697,
+      "token_text": " tranquility"
+    },
+    "109": {
+      "jitter": 0.18113450706005096,
+      "token_text": " to"
+    },
+    "110": {
+      "jitter": 0.1588805615901947,
+      "token_text": " the"
+    },
+    "111": {
+      "jitter": 0.2910732328891754,
+      "token_text": " scene"
+    },
+    "112": {
+      "jitter": 0.23381395637989044,
+      "token_text": "."
+    },
+    "113": {
+      "jitter": 0.2906622439622879,
+      "token_text": " The"
+    },
+    "114": {
+      "jitter": 0.21920984983444214,
+      "token_text": " overall"
+    },
+    "115": {
+      "jitter": 0.40753087401390076,
+      "token_text": " image"
+    },
+    "116": {
+      "jitter": 0.12820693850517273,
+      "token_text": " paints"
+    },
+    "117": {
+      "jitter": 0.07643991708755493,
+      "token_text": " a"
+    },
+    "118": {
+      "jitter": 0.1895243376493454,
+      "token_text": " picture"
+    },
+    "119": {
+      "jitter": 0.21009942889213562,
+      "token_text": " of"
+    },
+    "120": {
+      "jitter": 0.1631375551223755,
+      "token_text": " everyday"
+    },
+    "121": {
+      "jitter": 0.18122003227472305,
+      "token_text": " life"
+    },
+    "122": {
+      "jitter": 0.07151149213314056,
+      "token_text": " in"
+    },
+    "123": {
+      "jitter": 0.0812559574842453,
+      "token_text": " an"
+    },
+    "124": {
+      "jitter": 0.16006487607955933,
+      "token_text": " urban"
+    },
+    "125": {
+      "jitter": 0.14291244745254517,
+      "token_text": " landscape"
+    },
+    "126": {
+      "jitter": 0.0,
+      "token_text": "."
+    },
+    "127": {
+      "jitter": 0.0,
+      "token_text": "<|eot_id|>"
+    }
+  },
+  "inconsistent_token": [
+    {
+      "token_id": 11,
+      "token_text": " painted"
+    },
+    {
+      "token_id": 12,
+      "token_text": " in"
+    },
+    {
+      "token_id": 13,
+      "token_text": " a"
+    },
+    {
+      "token_id": 14,
+      "token_text": " vibrant"
+    },
+    {
+      "token_id": 15,
+      "token_text": " shade"
+    },
+    {
+      "token_id": 16,
+      "token_text": " of"
+    },
+    {
+      "token_id": 17,
+      "token_text": " orange"
+    },
+    {
+      "token_id": 35,
+      "token_text": " silver"
+    },
+    {
+      "token_id": 36,
+      "token_text": " chain"
+    },
+    {
+      "token_id": 41,
+      "token_text": " a"
+    },
+    {
+      "token_id": 42,
+      "token_text": " stone"
+    },
+    {
+      "token_id": 43,
+      "token_text": " wall"
+    },
+    {
+      "token_id": 44,
+      "token_text": " that"
+    },
+    {
+      "token_id": 45,
+      "token_text": " adds"
+    },
+    {
+      "token_id": 46,
+      "token_text": " a"
+    },
+    {
+      "token_id": 47,
+      "token_text": " touch"
+    },
+    {
+      "token_id": 48,
+      "token_text": " of"
+    },
+    {
+      "token_id": 49,
+      "token_text": " elegance"
+    },
+    {
+      "token_id": 50,
+      "token_text": " to"
+    },
+    {
+      "token_id": 51,
+      "token_text": " the"
+    },
+    {
+      "token_id": 52,
+      "token_text": " scene"
+    },
+    {
+      "token_id": 58,
+      "token_text": " a"
+    },
+    {
+      "token_id": 59,
+      "token_text": " lush"
+    },
+    {
+      "token_id": 60,
+      "token_text": " green"
+    },
+    {
+      "token_id": 61,
+      "token_text": " garden"
+    },
+    {
+      "token_id": 75,
+      "token_text": " A"
+    },
+    {
+      "token_id": 76,
+      "token_text": " building"
+    },
+    {
+      "token_id": 77,
+      "token_text": ","
+    },
+    {
+      "token_id": 78,
+      "token_text": " possibly"
+    },
+    {
+      "token_id": 79,
+      "token_text": " a"
+    },
+    {
+      "token_id": 80,
+      "token_text": " residential"
+    },
+    {
+      "token_id": 81,
+      "token_text": " or"
+    },
+    {
+      "token_id": 82,
+      "token_text": " commercial"
+    },
+    {
+      "token_id": 83,
+      "token_text": " establishment"
+    }
+  ],
+  "fine_grained_token": [
+    {
+      "token_id": 31,
+      "token_text": " its"
+    },
+    {
+      "token_id": 32,
+      "token_text": " black"
+    },
+    {
+      "token_id": 33,
+      "token_text": " top"
+    },
+    {
+      "token_id": 95,
+      "token_text": " A"
+    },
+    {
+      "token_id": 96,
+      "token_text": " few"
+    },
+    {
+      "token_id": 97,
+      "token_text": " leaves"
+    },
+    {
+      "token_id": 98,
+      "token_text": " are"
+    },
+    {
+      "token_id": 99,
+      "token_text": " scattered"
+    },
+    {
+      "token_id": 100,
+      "token_text": " on"
+    },
+    {
+      "token_id": 101,
+      "token_text": " the"
+    },
+    {
+      "token_id": 102,
+      "token_text": " sidewalk"
+    }
+  ],
+  "statistics": {
+    "all_tokens_mean": 0.19543742726091295,
+    "inconsistent_tokens_mean": 0.20826413197552457,
+    "fine_grained_tokens_mean": 0.24101935462518173,
+    "marked_tokens_mean": 0.2162709641787741,
+    "max_jitter": 0.7670599222183228,
+    "min_jitter": 0.0
+  }
+}

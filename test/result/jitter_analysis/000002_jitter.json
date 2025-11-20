@@ -1,0 +1,794 @@
+{
+  "index": 2,
+  "num_tokens": 128,
+  "jitter_values": {
+    "0": {
+      "jitter": 0.027752339839935303,
+      "token_text": "In"
+    },
+    "1": {
+      "jitter": 0.0,
+      "token_text": " the"
+    },
+    "2": {
+      "jitter": 0.007065951824188232,
+      "token_text": " image"
+    },
+    "3": {
+      "jitter": 0.014267206192016602,
+      "token_text": ","
+    },
+    "4": {
+      "jitter": 0.047534823417663574,
+      "token_text": " a"
+    },
+    "5": {
+      "jitter": 0.03313279151916504,
+      "token_text": " man"
+    },
+    "6": {
+      "jitter": 0.017701655626296997,
+      "token_text": " is"
+    },
+    "7": {
+      "jitter": 0.1822832226753235,
+      "token_text": " seen"
+    },
+    "8": {
+      "jitter": 0.062087640166282654,
+      "token_text": " skate"
+    },
+    "9": {
+      "jitter": 0.009472757577896118,
+      "token_text": "boarding"
+    },
+    "10": {
+      "jitter": 0.04587790369987488,
+      "token_text": " on"
+    },
+    "11": {
+      "jitter": 0.09545223414897919,
+      "token_text": " a"
+    },
+    "12": {
+      "jitter": 0.08047161996364594,
+      "token_text": " highway"
+    },
+    "13": {
+      "jitter": 0.08190126717090607,
+      "token_text": "."
+    },
+    "14": {
+      "jitter": 0.1326306313276291,
+      "token_text": " He"
+    },
+    "15": {
+      "jitter": 0.04868954420089722,
+      "token_text": " is"
+    },
+    "16": {
+      "jitter": 0.1480737328529358,
+      "token_text": " dressed"
+    },
+    "17": {
+      "jitter": 0.09039697051048279,
+      "token_text": " in"
+    },
+    "18": {
+      "jitter": 0.058252766728401184,
+      "token_text": " a"
+    },
+    "19": {
+      "jitter": 0.11642168462276459,
+      "token_text": " black"
+    },
+    "20": {
+      "jitter": 0.09158027917146683,
+      "token_text": " t"
+    },
+    "21": {
+      "jitter": 0.04392450302839279,
+      "token_text": "-shirt"
+    },
+    "22": {
+      "jitter": 0.015051335096359253,
+      "token_text": " and"
+    },
+    "23": {
+      "jitter": 0.11581754684448242,
+      "token_text": " gray"
+    },
+    "24": {
+      "jitter": 0.12274892628192902,
+      "token_text": " pants"
+    },
+    "25": {
+      "jitter": 0.07920226454734802,
+      "token_text": ","
+    },
+    "26": {
+      "jitter": 0.5411732047796249,
+      "token_text": " and"
+    },
+    "27": {
+      "jitter": 0.09971627593040466,
+      "token_text": " he"
+    },
+    "28": {
+      "jitter": 0.08839967846870422,
+      "token_text": " is"
+    },
+    "29": {
+      "jitter": 0.10581982880830765,
+      "token_text": " carrying"
+    },
+    "30": {
+      "jitter": 0.07594343274831772,
+      "token_text": " a"
+    },
+    "31": {
+      "jitter": 0.07261437922716141,
+      "token_text": " red"
+    },
+    "32": {
+      "jitter": 0.10194087028503418,
+      "token_text": " bag"
+    },
+    "33": {
+      "jitter": 0.19213151186704636,
+      "token_text": " under"
+    },
+    "34": {
+      "jitter": 0.10553563386201859,
+      "token_text": " his"
+    },
+    "35": {
+      "jitter": 0.1542818248271942,
+      "token_text": " arm"
+    },
+    "36": {
+      "jitter": 0.07268758118152618,
+      "token_text": "."
+    },
+    "37": {
+      "jitter": 0.10713056474924088,
+      "token_text": " The"
+    },
+    "38": {
+      "jitter": 0.05848085135221481,
+      "token_text": " highway"
+    },
+    "39": {
+      "jitter": 0.07054480910301208,
+      "token_text": " is"
+    },
+    "40": {
+      "jitter": 0.3951418250799179,
+      "token_text": " busy"
+    },
+    "41": {
+      "jitter": 0.0963975116610527,
+      "token_text": " with"
+    },
+    "42": {
+      "jitter": 0.37980636209249496,
+      "token_text": " several"
+    },
+    "43": {
+      "jitter": 0.0784706324338913,
+      "token_text": " cars"
+    },
+    "44": {
+      "jitter": 0.8161601051688194,
+      "token_text": " on"
+    },
+    "45": {
+      "jitter": 0.16219089925289154,
+      "token_text": " both"
+    },
+    "46": {
+      "jitter": 0.15823223441839218,
+      "token_text": " sides"
+    },
+    "47": {
+      "jitter": 0.20465335249900818,
+      "token_text": ","
+    },
+    "48": {
+      "jitter": 0.27770163863897324,
+      "token_text": " but"
+    },
+    "49": {
+      "jitter": 0.16327939927577972,
+      "token_text": " the"
+    },
+    "50": {
+      "jitter": 0.23793858289718628,
+      "token_text": " man"
+    },
+    "51": {
+      "jitter": 0.06368397176265717,
+      "token_text": " is"
+    },
+    "52": {
+      "jitter": 0.9538297951221466,
+      "token_text": " standing"
+    },
+    "53": {
+      "jitter": 0.2638295665383339,
+      "token_text": " in"
+    },
+    "54": {
+      "jitter": 0.392164945602417,
+      "token_text": " the"
+    },
+    "55": {
+      "jitter": 0.23170791566371918,
+      "token_text": " middle"
+    },
+    "56": {
+      "jitter": 0.12101611495018005,
+      "token_text": " of"
+    },
+    "57": {
+      "jitter": 0.17886736243963242,
+      "token_text": " the"
+    },
+    "58": {
+      "jitter": 0.10495331883430481,
+      "token_text": " road"
+    },
+    "59": {
+      "jitter": 0.1556394174695015,
+      "token_text": ","
+    },
+    "60": {
+      "jitter": 0.5095342248678207,
+      "token_text": " unaffected"
+    },
+    "61": {
+      "jitter": 0.2974572330713272,
+      "token_text": " by"
+    },
+    "62": {
+      "jitter": 0.15969955921173096,
+      "token_text": " the"
+    },
+    "63": {
+      "jitter": 0.1364043653011322,
+      "token_text": " traffic"
+    },
+    "64": {
+      "jitter": 0.09733158349990845,
+      "token_text": "."
+    },
+    "65": {
+      "jitter": 0.21495451033115387,
+      "token_text": " The"
+    },
+    "66": {
+      "jitter": 0.18615485727787018,
+      "token_text": " photo"
+    },
+    "67": {
+      "jitter": 0.08607684075832367,
+      "token_text": " is"
+    },
+    "68": {
+      "jitter": 0.15809863805770874,
+      "token_text": " taken"
+    },
+    "69": {
+      "jitter": 0.12148977816104889,
+      "token_text": " from"
+    },
+    "70": {
+      "jitter": 0.0966515839099884,
+      "token_text": " the"
+    },
+    "71": {
+      "jitter": 0.09200066328048706,
+      "token_text": " perspective"
+    },
+    "72": {
+      "jitter": 0.15913046896457672,
+      "token_text": " of"
+    },
+    "73": {
+      "jitter": 0.0976380854845047,
+      "token_text": " a"
+    },
+    "74": {
+      "jitter": 0.1466677337884903,
+      "token_text": " car"
+    },
+    "75": {
+      "jitter": 0.7771702706813812,
+      "token_text": "'s"
+    },
+    "76": {
+      "jitter": 0.39629222452640533,
+      "token_text": " side"
+    },
+    "77": {
+      "jitter": 0.1540309339761734,
+      "token_text": " mirror"
+    },
+    "78": {
+      "jitter": 0.2207670956850052,
+      "token_text": ","
+    },
+    "79": {
+      "jitter": 0.2217540293931961,
+      "token_text": " providing"
+    },
+    "80": {
+      "jitter": 0.08858682215213776,
+      "token_text": " a"
+    },
+    "81": {
+      "jitter": 0.18627724051475525,
+      "token_text": " unique"
+    },
+    "82": {
+      "jitter": 0.12899525463581085,
+      "token_text": " view"
+    },
+    "83": {
+      "jitter": 0.1169729232788086,
+      "token_text": " of"
+    },
+    "84": {
+      "jitter": 0.21545624732971191,
+      "token_text": " the"
+    },
+    "85": {
+      "jitter": 0.10930760204792023,
+      "token_text": " man"
+    },
+    "86": {
+      "jitter": 0.528434544801712,
+      "token_text": " and"
+    },
+    "87": {
+      "jitter": 0.4365917295217514,
+      "token_text": " the"
+    },
+    "88": {
+      "jitter": 0.21915584802627563,
+      "token_text": " highway"
+    },
+    "89": {
+      "jitter": 0.12299224734306335,
+      "token_text": "."
+    },
+    "90": {
+      "jitter": 0.10063530504703522,
+      "token_text": " The"
+    },
+    "91": {
+      "jitter": 0.17768163979053497,
+      "token_text": " sky"
+    },
+    "92": {
+      "jitter": 0.15297004580497742,
+      "token_text": " is"
+    },
+    "93": {
+      "jitter": 0.12115834653377533,
+      "token_text": " a"
+    },
+    "94": {
+      "jitter": 0.14252741634845734,
+      "token_text": " clear"
+    },
+    "95": {
+      "jitter": 0.1423235684633255,
+      "token_text": " blue"
+    },
+    "96": {
+      "jitter": 0.14056280255317688,
+      "token_text": ","
+    },
+    "97": {
+      "jitter": 0.12337470054626465,
+      "token_text": " and"
+    },
+    "98": {
+      "jitter": 0.16562218964099884,
+      "token_text": " the"
+    },
+    "99": {
+      "jitter": 0.5720357149839401,
+      "token_text": " highway"
+    },
+    "100": {
+      "jitter": 0.3770929425954819,
+      "token_text": " is"
+    },
+    "101": {
+      "jitter": 0.33547522127628326,
+      "token_text": " lined"
+    },
+    "102": {
+      "jitter": 0.3342459723353386,
+      "token_text": " with"
+    },
+    "103": {
+      "jitter": 0.42336679995059967,
+      "token_text": " trees"
+    },
+    "104": {
+      "jitter": 0.3395971208810806,
+      "token_text": " on"
+    },
+    "105": {
+      "jitter": 0.24899126589298248,
+      "token_text": " both"
+    },
+    "106": {
+      "jitter": 0.17472122609615326,
+      "token_text": " sides"
+    },
+    "107": {
+      "jitter": 0.2667663097381592,
+      "token_text": "."
+    },
+    "108": {
+      "jitter": 0.3205900490283966,
+      "token_text": " The"
+    },
+    "109": {
+      "jitter": 0.3580058291554451,
+      "token_text": " man"
+    },
+    "110": {
+      "jitter": 0.3872571587562561,
+      "token_text": " appears"
+    },
+    "111": {
+      "jitter": 0.25858181715011597,
+      "token_text": " to"
+    },
+    "112": {
+      "jitter": 0.29950595647096634,
+      "token_text": " be"
+    },
+    "113": {
+      "jitter": 0.25319261103868484,
+      "token_text": " in"
+    },
+    "114": {
+      "jitter": 0.2117581069469452,
+      "token_text": " control"
+    },
+    "115": {
+      "jitter": 0.2270936369895935,
+      "token_text": " of"
+    },
+    "116": {
+      "jitter": 0.25297483801841736,
+      "token_text": " his"
+    },
+    "117": {
+      "jitter": 0.29617294669151306,
+      "token_text": " skateboard"
+    },
+    "118": {
+      "jitter": 0.2832563519477844,
+      "token_text": ","
+    },
+    "119": {
+      "jitter": 0.4647834002971649,
+      "token_text": " despite"
+    },
+    "120": {
+      "jitter": 0.6118015497922897,
+      "token_text": " the"
+    },
+    "121": {
+      "jitter": 1.2304713279008865,
+      "token_text": " busy"
+    },
+    "122": {
+      "jitter": 1.7271274849772453,
+      "token_text": " traffic"
+    },
+    "123": {
+      "jitter": 0.0745340883731842,
+      "token_text": " on"
+    },
+    "124": {
+      "jitter": 0.1374383568763733,
+      "token_text": " the"
+    },
+    "125": {
+      "jitter": 0.17555758357048035,
+      "token_text": " highway"
+    },
+    "126": {
+      "jitter": 0.0,
+      "token_text": "."
+    },
+    "127": {
+      "jitter": 0.0,
+      "token_text": "<|eot_id|>"
+    }
+  },
+  "inconsistent_token": [
+    {
+      "token_id": 8,
+      "token_text": " skate"
+    },
+    {
+      "token_id": 9,
+      "token_text": "boarding"
+    },
+    {
+      "token_id": 10,
+      "token_text": " on"
+    },
+    {
+      "token_id": 11,
+      "token_text": " a"
+    },
+    {
+      "token_id": 12,
+      "token_text": " highway"
+    },
+    {
+      "token_id": 30,
+      "token_text": " a"
+    },
+    {
+      "token_id": 31,
+      "token_text": " red"
+    },
+    {
+      "token_id": 32,
+      "token_text": " bag"
+    },
+    {
+      "token_id": 33,
+      "token_text": " under"
+    },
+    {
+      "token_id": 34,
+      "token_text": " his"
+    },
+    {
+      "token_id": 35,
+      "token_text": " arm"
+    },
+    {
+      "token_id": 44,
+      "token_text": " on"
+    },
+    {
+      "token_id": 45,
+      "token_text": " both"
+    },
+    {
+      "token_id": 46,
+      "token_text": " sides"
+    },
+    {
+      "token_id": 53,
+      "token_text": " in"
+    },
+    {
+      "token_id": 54,
+      "token_text": " the"
+    },
+    {
+      "token_id": 55,
+      "token_text": " middle"
+    },
+    {
+      "token_id": 56,
+      "token_text": " of"
+    },
+    {
+      "token_id": 57,
+      "token_text": " the"
+    },
+    {
+      "token_id": 58,
+      "token_text": " road"
+    },
+    {
+      "token_id": 69,
+      "token_text": " from"
+    },
+    {
+      "token_id": 70,
+      "token_text": " the"
+    },
+    {
+      "token_id": 71,
+      "token_text": " perspective"
+    },
+    {
+      "token_id": 72,
+      "token_text": " of"
+    },
+    {
+      "token_id": 73,
+      "token_text": " a"
+    },
+    {
+      "token_id": 74,
+      "token_text": " car"
+    },
+    {
+      "token_id": 75,
+      "token_text": "'s"
+    },
+    {
+      "token_id": 76,
+      "token_text": " side"
+    },
+    {
+      "token_id": 77,
+      "token_text": " mirror"
+    },
+    {
+      "token_id": 101,
+      "token_text": " lined"
+    },
+    {
+      "token_id": 102,
+      "token_text": " with"
+    },
+    {
+      "token_id": 103,
+      "token_text": " trees"
+    },
+    {
+      "token_id": 104,
+      "token_text": " on"
+    },
+    {
+      "token_id": 105,
+      "token_text": " both"
+    },
+    {
+      "token_id": 106,
+      "token_text": " sides"
+    },
+    {
+      "token_id": 113,
+      "token_text": " in"
+    },
+    {
+      "token_id": 114,
+      "token_text": " control"
+    },
+    {
+      "token_id": 115,
+      "token_text": " of"
+    },
+    {
+      "token_id": 116,
+      "token_text": " his"
+    },
+    {
+      "token_id": 117,
+      "token_text": " skateboard"
+    },
+    {
+      "token_id": 118,
+      "token_text": ","
+    },
+    {
+      "token_id": 119,
+      "token_text": " despite"
+    },
+    {
+      "token_id": 120,
+      "token_text": " the"
+    },
+    {
+      "token_id": 121,
+      "token_text": " busy"
+    },
+    {
+      "token_id": 122,
+      "token_text": " traffic"
+    },
+    {
+      "token_id": 123,
+      "token_text": " on"
+    },
+    {
+      "token_id": 124,
+      "token_text": " the"
+    },
+    {
+      "token_id": 125,
+      "token_text": " highway"
+    }
+  ],
+  "fine_grained_token": [
+    {
+      "token_id": 19,
+      "token_text": " black"
+    },
+    {
+      "token_id": 20,
+      "token_text": " t"
+    },
+    {
+      "token_id": 21,
+      "token_text": "-shirt"
+    },
+    {
+      "token_id": 23,
+      "token_text": " gray"
+    },
+    {
+      "token_id": 24,
+      "token_text": " pants"
+    },
+    {
+      "token_id": 37,
+      "token_text": " The"
+    },
+    {
+      "token_id": 38,
+      "token_text": " highway"
+    },
+    {
+      "token_id": 39,
+      "token_text": " is"
+    },
+    {
+      "token_id": 40,
+      "token_text": " busy"
+    },
+    {
+      "token_id": 41,
+      "token_text": " with"
+    },
+    {
+      "token_id": 42,
+      "token_text": " several"
+    },
+    {
+      "token_id": 43,
+      "token_text": " cars"
+    },
+    {
+      "token_id": 90,
+      "token_text": " The"
+    },
+    {
+      "token_id": 91,
+      "token_text": " sky"
+    },
+    {
+      "token_id": 92,
+      "token_text": " is"
+    },
+    {
+      "token_id": 93,
+      "token_text": " a"
+    },
+    {
+      "token_id": 94,
+      "token_text": " clear"
+    },
+    {
+      "token_id": 95,
+      "token_text": " blue"
+    }
+  ],
+  "statistics": {
+    "all_tokens_mean": 0.2143842485966161,
+    "inconsistent_tokens_mean": 0.2764284146639208,
+    "fine_grained_tokens_mean": 0.13965343435605368,
+    "marked_tokens_mean": 0.23912614730722975,
+    "max_jitter": 1.7271274849772453,
+    "min_jitter": 0.0
+  }
+}

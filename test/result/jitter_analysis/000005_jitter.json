@@ -1,0 +1,754 @@
+{
+  "index": 5,
+  "num_tokens": 128,
+  "jitter_values": {
+    "0": {
+      "jitter": 0.0,
+      "token_text": "In"
+    },
+    "1": {
+      "jitter": 0.0,
+      "token_text": " the"
+    },
+    "2": {
+      "jitter": 0.12393242120742798,
+      "token_text": " image"
+    },
+    "3": {
+      "jitter": 0.1349162459373474,
+      "token_text": ","
+    },
+    "4": {
+      "jitter": 0.0,
+      "token_text": " a"
+    },
+    "5": {
+      "jitter": 0.0,
+      "token_text": " skateboard"
+    },
+    "6": {
+      "jitter": 0.38324445486068726,
+      "token_text": "er"
+    },
+    "7": {
+      "jitter": 0.2097136676311493,
+      "token_text": " is"
+    },
+    "8": {
+      "jitter": 0.06303465366363525,
+      "token_text": " captured"
+    },
+    "9": {
+      "jitter": 0.016408592462539673,
+      "token_text": " in"
+    },
+    "10": {
+      "jitter": 0.06353294849395752,
+      "token_text": " mid"
+    },
+    "11": {
+      "jitter": 0.2998729348182678,
+      "token_text": "-action"
+    },
+    "12": {
+      "jitter": 0.10422484576702118,
+      "token_text": ","
+    },
+    "13": {
+      "jitter": 0.006021708250045776,
+      "token_text": " performing"
+    },
+    "14": {
+      "jitter": 0.09263382852077484,
+      "token_text": " a"
+    },
+    "15": {
+      "jitter": 0.18722762167453766,
+      "token_text": " daring"
+    },
+    "16": {
+      "jitter": 0.11430417001247406,
+      "token_text": " trick"
+    },
+    "17": {
+      "jitter": 0.08330994844436646,
+      "token_text": " on"
+    },
+    "18": {
+      "jitter": 0.05208234488964081,
+      "token_text": " a"
+    },
+    "19": {
+      "jitter": 0.04846712946891785,
+      "token_text": " concrete"
+    },
+    "20": {
+      "jitter": 0.28567762672901154,
+      "token_text": " ledge"
+    },
+    "21": {
+      "jitter": 0.16132515668869019,
+      "token_text": "."
+    },
+    "22": {
+      "jitter": 0.17871567606925964,
+      "token_text": " The"
+    },
+    "23": {
+      "jitter": 0.17138671875,
+      "token_text": " skateboard"
+    },
+    "24": {
+      "jitter": 0.10793112218379974,
+      "token_text": "er"
+    },
+    "25": {
+      "jitter": 0.0831926167011261,
+      "token_text": ","
+    },
+    "26": {
+      "jitter": 0.20719978213310242,
+      "token_text": " dressed"
+    },
+    "27": {
+      "jitter": 0.06219032406806946,
+      "token_text": " in"
+    },
+    "28": {
+      "jitter": 0.08902345597743988,
+      "token_text": " a"
+    },
+    "29": {
+      "jitter": 0.23860996961593628,
+      "token_text": " yellow"
+    },
+    "30": {
+      "jitter": 0.10410557687282562,
+      "token_text": " t"
+    },
+    "31": {
+      "jitter": 0.3252299129962921,
+      "token_text": "-shirt"
+    },
+    "32": {
+      "jitter": 0.29160434007644653,
+      "token_text": " and"
+    },
+    "33": {
+      "jitter": 0.08657559752464294,
+      "token_text": " black"
+    },
+    "34": {
+      "jitter": 0.10807928442955017,
+      "token_text": " pants"
+    },
+    "35": {
+      "jitter": 0.08191543817520142,
+      "token_text": ","
+    },
+    "36": {
+      "jitter": 0.03765006363391876,
+      "token_text": " is"
+    },
+    "37": {
+      "jitter": 0.4077877998352051,
+      "token_text": " balancing"
+    },
+    "38": {
+      "jitter": 0.3568620830774307,
+      "token_text": " on"
+    },
+    "39": {
+      "jitter": 0.4464005380868912,
+      "token_text": " the"
+    },
+    "40": {
+      "jitter": 0.8035098016262054,
+      "token_text": " nose"
+    },
+    "41": {
+      "jitter": 0.21349788457155228,
+      "token_text": " of"
+    },
+    "42": {
+      "jitter": 0.18703701347112656,
+      "token_text": " the"
+    },
+    "43": {
+      "jitter": 0.16062773764133453,
+      "token_text": " skateboard"
+    },
+    "44": {
+      "jitter": 0.09784087538719177,
+      "token_text": ","
+    },
+    "45": {
+      "jitter": 0.3375844955444336,
+      "token_text": " with"
+    },
+    "46": {
+      "jitter": 0.31169961392879486,
+      "token_text": " their"
+    },
+    "47": {
+      "jitter": 0.24908612668514252,
+      "token_text": " arms"
+    },
+    "48": {
+      "jitter": 0.46953388303518295,
+      "token_text": " out"
+    },
+    "49": {
+      "jitter": 0.21821970492601395,
+      "token_text": "st"
+    },
+    "50": {
+      "jitter": 0.1919751912355423,
+      "token_text": "retched"
+    },
+    "51": {
+      "jitter": 0.18108686804771423,
+      "token_text": " for"
+    },
+    "52": {
+      "jitter": 0.16967147588729858,
+      "token_text": " balance"
+    },
+    "53": {
+      "jitter": 0.16553723067045212,
+      "token_text": "."
+    },
+    "54": {
+      "jitter": 0.15706103295087814,
+      "token_text": " The"
+    },
+    "55": {
+      "jitter": 0.12355196475982666,
+      "token_text": " ledge"
+    },
+    "56": {
+      "jitter": 0.5385852307081223,
+      "token_text": ","
+    },
+    "57": {
+      "jitter": 0.24294577538967133,
+      "token_text": " adorned"
+    },
+    "58": {
+      "jitter": 0.1578572392463684,
+      "token_text": " with"
+    },
+    "59": {
+      "jitter": 0.24928735941648483,
+      "token_text": " graffiti"
+    },
+    "60": {
+      "jitter": 0.17790384590625763,
+      "token_text": ","
+    },
+    "61": {
+      "jitter": 0.39395682513713837,
+      "token_text": " serves"
+    },
+    "62": {
+      "jitter": 0.43508239835500717,
+      "token_text": " as"
+    },
+    "63": {
+      "jitter": 0.40559543669223785,
+      "token_text": " the"
+    },
+    "64": {
+      "jitter": 0.3693396523594856,
+      "token_text": " stage"
+    },
+    "65": {
+      "jitter": 0.20761214196681976,
+      "token_text": " for"
+    },
+    "66": {
+      "jitter": 0.22001509368419647,
+      "token_text": " the"
+    },
+    "67": {
+      "jitter": 0.32577720284461975,
+      "token_text": " skateboard"
+    },
+    "68": {
+      "jitter": 0.27076052874326706,
+      "token_text": "er"
+    },
+    "69": {
+      "jitter": 0.23109019547700882,
+      "token_text": "'s"
+    },
+    "70": {
+      "jitter": 0.42933210730552673,
+      "token_text": " performance"
+    },
+    "71": {
+      "jitter": 0.2675192579627037,
+      "token_text": "."
+    },
+    "72": {
+      "jitter": 0.47142577916383743,
+      "token_text": " The"
+    },
+    "73": {
+      "jitter": 0.8773208111524582,
+      "token_text": " scene"
+    },
+    "74": {
+      "jitter": 0.4882959648966789,
+      "token_text": " is"
+    },
+    "75": {
+      "jitter": 0.3139699250459671,
+      "token_text": " set"
+    },
+    "76": {
+      "jitter": 0.5855918452143669,
+      "token_text": " in"
+    },
+    "77": {
+      "jitter": 0.4108109772205353,
+      "token_text": " a"
+    },
+    "78": {
+      "jitter": 0.9260130226612091,
+      "token_text": " grassy"
+    },
+    "79": {
+      "jitter": 0.5041374415159225,
+      "token_text": " area"
+    },
+    "80": {
+      "jitter": 0.2241482436656952,
+      "token_text": ","
+    },
+    "81": {
+      "jitter": 0.19225440919399261,
+      "token_text": " with"
+    },
+    "82": {
+      "jitter": 0.1750108152627945,
+      "token_text": " trees"
+    },
+    "83": {
+      "jitter": 0.1463235467672348,
+      "token_text": " and"
+    },
+    "84": {
+      "jitter": 0.1380298137664795,
+      "token_text": " a"
+    },
+    "85": {
+      "jitter": 0.26468442380428314,
+      "token_text": " building"
+    },
+    "86": {
+      "jitter": 0.2602623850107193,
+      "token_text": " visible"
+    },
+    "87": {
+      "jitter": 0.12841609120368958,
+      "token_text": " in"
+    },
+    "88": {
+      "jitter": 0.10798592865467072,
+      "token_text": " the"
+    },
+    "89": {
+      "jitter": 0.29766014218330383,
+      "token_text": " distance"
+    },
+    "90": {
+      "jitter": 0.13757207989692688,
+      "token_text": "."
+    },
+    "91": {
+      "jitter": 0.10726538300514221,
+      "token_text": " A"
+    },
+    "92": {
+      "jitter": 0.11965446174144745,
+      "token_text": " trash"
+    },
+    "93": {
+      "jitter": 0.10652787983417511,
+      "token_text": " can"
+    },
+    "94": {
+      "jitter": 0.11946287751197815,
+      "token_text": " and"
+    },
+    "95": {
+      "jitter": 0.11065033078193665,
+      "token_text": " a"
+    },
+    "96": {
+      "jitter": 0.08061020076274872,
+      "token_text": " bench"
+    },
+    "97": {
+      "jitter": 0.06889165937900543,
+      "token_text": " can"
+    },
+    "98": {
+      "jitter": 0.11757448315620422,
+      "token_text": " be"
+    },
+    "99": {
+      "jitter": 0.11191277205944061,
+      "token_text": " seen"
+    },
+    "100": {
+      "jitter": 0.10040602087974548,
+      "token_text": " in"
+    },
+    "101": {
+      "jitter": 0.07955223321914673,
+      "token_text": " the"
+    },
+    "102": {
+      "jitter": 0.16934926807880402,
+      "token_text": " background"
+    },
+    "103": {
+      "jitter": 0.09612840414047241,
+      "token_text": ","
+    },
+    "104": {
+      "jitter": 0.10223159193992615,
+      "token_text": " adding"
+    },
+    "105": {
+      "jitter": 0.10513463616371155,
+      "token_text": " a"
+    },
+    "106": {
+      "jitter": 0.15102314949035645,
+      "token_text": " sense"
+    },
+    "107": {
+      "jitter": 0.14099328219890594,
+      "token_text": " of"
+    },
+    "108": {
+      "jitter": 0.32023340463638306,
+      "token_text": " location"
+    },
+    "109": {
+      "jitter": 0.39431628584861755,
+      "token_text": " to"
+    },
+    "110": {
+      "jitter": 0.2155410498380661,
+      "token_text": " the"
+    },
+    "111": {
+      "jitter": 0.7537144720554352,
+      "token_text": " scene"
+    },
+    "112": {
+      "jitter": 0.09252633154392242,
+      "token_text": "."
+    },
+    "113": {
+      "jitter": 0.15842509269714355,
+      "token_text": " The"
+    },
+    "114": {
+      "jitter": 0.3044724315404892,
+      "token_text": " image"
+    },
+    "115": {
+      "jitter": 0.21334461867809296,
+      "token_text": " captures"
+    },
+    "116": {
+      "jitter": 0.04418252408504486,
+      "token_text": " a"
+    },
+    "117": {
+      "jitter": 0.2501625418663025,
+      "token_text": " moment"
+    },
+    "118": {
+      "jitter": 0.15760527551174164,
+      "token_text": " of"
+    },
+    "119": {
+      "jitter": 0.47239020466804504,
+      "token_text": " skill"
+    },
+    "120": {
+      "jitter": 0.10292288661003113,
+      "token_text": " and"
+    },
+    "121": {
+      "jitter": 0.04622727632522583,
+      "token_text": " the"
+    },
+    "122": {
+      "jitter": 0.13532043993473053,
+      "token_text": " thrill"
+    },
+    "123": {
+      "jitter": 0.05029655992984772,
+      "token_text": " of"
+    },
+    "124": {
+      "jitter": 0.11902177333831787,
+      "token_text": " skate"
+    },
+    "125": {
+      "jitter": 0.03145569562911987,
+      "token_text": "boarding"
+    },
+    "126": {
+      "jitter": 0.0,
+      "token_text": "."
+    },
+    "127": {
+      "jitter": 0.0,
+      "token_text": "<|eot_id|>"
+    }
+  },
+  "inconsistent_token": [
+    {
+      "token_id": 33,
+      "token_text": " black"
+    },
+    {
+      "token_id": 34,
+      "token_text": " pants"
+    },
+    {
+      "token_id": 37,
+      "token_text": " balancing"
+    },
+    {
+      "token_id": 38,
+      "token_text": " on"
+    },
+    {
+      "token_id": 39,
+      "token_text": " the"
+    },
+    {
+      "token_id": 40,
+      "token_text": " nose"
+    },
+    {
+      "token_id": 41,
+      "token_text": " of"
+    },
+    {
+      "token_id": 42,
+      "token_text": " the"
+    },
+    {
+      "token_id": 43,
+      "token_text": " skateboard"
+    },
+    {
+      "token_id": 95,
+      "token_text": " a"
+    },
+    {
+      "token_id": 96,
+      "token_text": " bench"
+    }
+  ],
+  "fine_grained_token": [
+    {
+      "token_id": 9,
+      "token_text": " in"
+    },
+    {
+      "token_id": 10,
+      "token_text": " mid"
+    },
+    {
+      "token_id": 11,
+      "token_text": "-action"
+    },
+    {
+      "token_id": 13,
+      "token_text": " performing"
+    },
+    {
+      "token_id": 14,
+      "token_text": " a"
+    },
+    {
+      "token_id": 15,
+      "token_text": " daring"
+    },
+    {
+      "token_id": 16,
+      "token_text": " trick"
+    },
+    {
+      "token_id": 17,
+      "token_text": " on"
+    },
+    {
+      "token_id": 18,
+      "token_text": " a"
+    },
+    {
+      "token_id": 19,
+      "token_text": " concrete"
+    },
+    {
+      "token_id": 20,
+      "token_text": " ledge"
+    },
+    {
+      "token_id": 26,
+      "token_text": " dressed"
+    },
+    {
+      "token_id": 27,
+      "token_text": " in"
+    },
+    {
+      "token_id": 28,
+      "token_text": " a"
+    },
+    {
+      "token_id": 29,
+      "token_text": " yellow"
+    },
+    {
+      "token_id": 30,
+      "token_text": " t"
+    },
+    {
+      "token_id": 31,
+      "token_text": "-shirt"
+    },
+    {
+      "token_id": 45,
+      "token_text": " with"
+    },
+    {
+      "token_id": 46,
+      "token_text": " their"
+    },
+    {
+      "token_id": 47,
+      "token_text": " arms"
+    },
+    {
+      "token_id": 48,
+      "token_text": " out"
+    },
+    {
+      "token_id": 49,
+      "token_text": "st"
+    },
+    {
+      "token_id": 50,
+      "token_text": "retched"
+    },
+    {
+      "token_id": 51,
+      "token_text": " for"
+    },
+    {
+      "token_id": 52,
+      "token_text": " balance"
+    },
+    {
+      "token_id": 57,
+      "token_text": " adorned"
+    },
+    {
+      "token_id": 58,
+      "token_text": " with"
+    },
+    {
+      "token_id": 59,
+      "token_text": " graffiti"
+    },
+    {
+      "token_id": 75,
+      "token_text": " set"
+    },
+    {
+      "token_id": 76,
+      "token_text": " in"
+    },
+    {
+      "token_id": 77,
+      "token_text": " a"
+    },
+    {
+      "token_id": 78,
+      "token_text": " grassy"
+    },
+    {
+      "token_id": 79,
+      "token_text": " area"
+    },
+    {
+      "token_id": 81,
+      "token_text": " with"
+    },
+    {
+      "token_id": 82,
+      "token_text": " trees"
+    },
+    {
+      "token_id": 83,
+      "token_text": " and"
+    },
+    {
+      "token_id": 84,
+      "token_text": " a"
+    },
+    {
+      "token_id": 85,
+      "token_text": " building"
+    },
+    {
+      "token_id": 86,
+      "token_text": " visible"
+    },
+    {
+      "token_id": 87,
+      "token_text": " in"
+    },
+    {
+      "token_id": 88,
+      "token_text": " the"
+    },
+    {
+      "token_id": 89,
+      "token_text": " distance"
+    },
+    {
+      "token_id": 100,
+      "token_text": " in"
+    },
+    {
+      "token_id": 101,
+      "token_text": " the"
+    },
+    {
+      "token_id": 102,
+      "token_text": " background"
+    }
+  ],
+  "statistics": {
+    "all_tokens_mean": 0.21229697606759146,
+    "inconsistent_tokens_mean": 0.2692398428916931,
+    "fine_grained_tokens_mean": 0.2190067532989714,
+    "marked_tokens_mean": 0.22887396732611315,
+    "max_jitter": 0.9260130226612091,
+    "min_jitter": 0.0
+  }
+}

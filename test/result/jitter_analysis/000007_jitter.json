@@ -1,0 +1,814 @@
+{
+  "index": 7,
+  "num_tokens": 128,
+  "jitter_values": {
+    "0": {
+      "jitter": 0.0,
+      "token_text": "In"
+    },
+    "1": {
+      "jitter": 0.0038968920707702637,
+      "token_text": " the"
+    },
+    "2": {
+      "jitter": 0.0,
+      "token_text": " image"
+    },
+    "3": {
+      "jitter": 0.0,
+      "token_text": ","
+    },
+    "4": {
+      "jitter": 0.03082224726676941,
+      "token_text": " there"
+    },
+    "5": {
+      "jitter": 0.008491963148117065,
+      "token_text": " are"
+    },
+    "6": {
+      "jitter": 0.5752224028110504,
+      "token_text": " six"
+    },
+    "7": {
+      "jitter": 0.06934322416782379,
+      "token_text": " gir"
+    },
+    "8": {
+      "jitter": 0.00340116024017334,
+      "token_text": "aff"
+    },
+    "9": {
+      "jitter": 0.0001866072416305542,
+      "token_text": "es"
+    },
+    "10": {
+      "jitter": 0.013812243938446045,
+      "token_text": " and"
+    },
+    "11": {
+      "jitter": 0.06264728307723999,
+      "token_text": " four"
+    },
+    "12": {
+      "jitter": 0.005920812487602234,
+      "token_text": " z"
+    },
+    "13": {
+      "jitter": 0.0,
+      "token_text": "eb"
+    },
+    "14": {
+      "jitter": 0.002435848116874695,
+      "token_text": "ras"
+    },
+    "15": {
+      "jitter": 0.009523101150989532,
+      "token_text": "."
+    },
+    "16": {
+      "jitter": 0.014313735067844391,
+      "token_text": " The"
+    },
+    "17": {
+      "jitter": 0.02794138342142105,
+      "token_text": " gir"
+    },
+    "18": {
+      "jitter": 0.016392379999160767,
+      "token_text": "aff"
+    },
+    "19": {
+      "jitter": 0.009915173053741455,
+      "token_text": "es"
+    },
+    "20": {
+      "jitter": 0.10057675838470459,
+      "token_text": " are"
+    },
+    "21": {
+      "jitter": 0.05089928209781647,
+      "token_text": " positioned"
+    },
+    "22": {
+      "jitter": 0.08238566666841507,
+      "token_text": " in"
+    },
+    "23": {
+      "jitter": 0.13317468017339706,
+      "token_text": " the"
+    },
+    "24": {
+      "jitter": 0.16695023328065872,
+      "token_text": " background"
+    },
+    "25": {
+      "jitter": 0.19585414975881577,
+      "token_text": ","
+    },
+    "26": {
+      "jitter": 0.045107707381248474,
+      "token_text": " with"
+    },
+    "27": {
+      "jitter": 0.5473831444978714,
+      "token_text": " two"
+    },
+    "28": {
+      "jitter": 0.47145530581474304,
+      "token_text": " of"
+    },
+    "29": {
+      "jitter": 0.4169696867465973,
+      "token_text": " them"
+    },
+    "30": {
+      "jitter": 0.08693355321884155,
+      "token_text": " standing"
+    },
+    "31": {
+      "jitter": 0.27795644104480743,
+      "token_text": " closer"
+    },
+    "32": {
+      "jitter": 0.11724327504634857,
+      "token_text": " to"
+    },
+    "33": {
+      "jitter": 0.13226333260536194,
+      "token_text": " the"
+    },
+    "34": {
+      "jitter": 0.971563994884491,
+      "token_text": " camera"
+    },
+    "35": {
+      "jitter": 0.2855486422777176,
+      "token_text": " and"
+    },
+    "36": {
+      "jitter": 0.12593531608581543,
+      "token_text": " two"
+    },
+    "37": {
+      "jitter": 0.15893301367759705,
+      "token_text": " further"
+    },
+    "38": {
+      "jitter": 0.16371268033981323,
+      "token_text": " away"
+    },
+    "39": {
+      "jitter": 0.12217029929161072,
+      "token_text": "."
+    },
+    "40": {
+      "jitter": 0.06785960495471954,
+      "token_text": " The"
+    },
+    "41": {
+      "jitter": 0.04945717751979828,
+      "token_text": " z"
+    },
+    "42": {
+      "jitter": 0.31369172036647797,
+      "token_text": "eb"
+    },
+    "43": {
+      "jitter": 0.08220349252223969,
+      "token_text": "ras"
+    },
+    "44": {
+      "jitter": 0.08326299488544464,
+      "token_text": " are"
+    },
+    "45": {
+      "jitter": 0.6887854486703873,
+      "token_text": " positioned"
+    },
+    "46": {
+      "jitter": 0.15261995792388916,
+      "token_text": " in"
+    },
+    "47": {
+      "jitter": 0.0858336091041565,
+      "token_text": " the"
+    },
+    "48": {
+      "jitter": 0.08298861980438232,
+      "token_text": " foreground"
+    },
+    "49": {
+      "jitter": 0.2128802388906479,
+      "token_text": ","
+    },
+    "50": {
+      "jitter": 0.22381427884101868,
+      "token_text": " with"
+    },
+    "51": {
+      "jitter": 0.16183333098888397,
+      "token_text": " two"
+    },
+    "52": {
+      "jitter": 0.12021604180335999,
+      "token_text": " of"
+    },
+    "53": {
+      "jitter": 0.1650134176015854,
+      "token_text": " them"
+    },
+    "54": {
+      "jitter": 0.16578592360019684,
+      "token_text": " standing"
+    },
+    "55": {
+      "jitter": 0.13268490135669708,
+      "token_text": " closer"
+    },
+    "56": {
+      "jitter": 0.10764269530773163,
+      "token_text": " to"
+    },
+    "57": {
+      "jitter": 0.1363755464553833,
+      "token_text": " the"
+    },
+    "58": {
+      "jitter": 0.15084049105644226,
+      "token_text": " camera"
+    },
+    "59": {
+      "jitter": 0.12269310653209686,
+      "token_text": " and"
+    },
+    "60": {
+      "jitter": 0.1416410356760025,
+      "token_text": " two"
+    },
+    "61": {
+      "jitter": 0.18645444512367249,
+      "token_text": " further"
+    },
+    "62": {
+      "jitter": 0.11407509446144104,
+      "token_text": " away"
+    },
+    "63": {
+      "jitter": 0.09143006801605225,
+      "token_text": "."
+    },
+    "64": {
+      "jitter": 0.08785194158554077,
+      "token_text": " The"
+    },
+    "65": {
+      "jitter": 0.18152937293052673,
+      "token_text": " z"
+    },
+    "66": {
+      "jitter": 0.1426999419927597,
+      "token_text": "eb"
+    },
+    "67": {
+      "jitter": 0.14979775249958038,
+      "token_text": "ras"
+    },
+    "68": {
+      "jitter": 0.1859348714351654,
+      "token_text": " are"
+    },
+    "69": {
+      "jitter": 0.3839211016893387,
+      "token_text": " scattered"
+    },
+    "70": {
+      "jitter": 0.3428446054458618,
+      "token_text": " across"
+    },
+    "71": {
+      "jitter": 0.25887368619441986,
+      "token_text": " the"
+    },
+    "72": {
+      "jitter": 0.1943201720714569,
+      "token_text": " image"
+    },
+    "73": {
+      "jitter": 0.13514837622642517,
+      "token_text": ","
+    },
+    "74": {
+      "jitter": 0.10707366466522217,
+      "token_text": " with"
+    },
+    "75": {
+      "jitter": 0.1337023377418518,
+      "token_text": " one"
+    },
+    "76": {
+      "jitter": 0.2763501852750778,
+      "token_text": " zebra"
+    },
+    "77": {
+      "jitter": 0.23125514388084412,
+      "token_text": " on"
+    },
+    "78": {
+      "jitter": 0.26680418848991394,
+      "token_text": " the"
+    },
+    "79": {
+      "jitter": 0.23704488575458527,
+      "token_text": " left"
+    },
+    "80": {
+      "jitter": 0.2777918130159378,
+      "token_text": " side"
+    },
+    "81": {
+      "jitter": 0.19365565478801727,
+      "token_text": ","
+    },
+    "82": {
+      "jitter": 0.567179262638092,
+      "token_text": " two"
+    },
+    "83": {
+      "jitter": 0.2537875473499298,
+      "token_text": " in"
+    },
+    "84": {
+      "jitter": 0.13028644025325775,
+      "token_text": " the"
+    },
+    "85": {
+      "jitter": 0.30888183414936066,
+      "token_text": " middle"
+    },
+    "86": {
+      "jitter": 0.20668065547943115,
+      "token_text": ","
+    },
+    "87": {
+      "jitter": 0.16379427909851074,
+      "token_text": " and"
+    },
+    "88": {
+      "jitter": 0.2876906991004944,
+      "token_text": " one"
+    },
+    "89": {
+      "jitter": 0.17815372347831726,
+      "token_text": " on"
+    },
+    "90": {
+      "jitter": 0.1678324192762375,
+      "token_text": " the"
+    },
+    "91": {
+      "jitter": 0.16906830668449402,
+      "token_text": " right"
+    },
+    "92": {
+      "jitter": 0.16285651922225952,
+      "token_text": " side"
+    },
+    "93": {
+      "jitter": 0.15186737477779388,
+      "token_text": "."
+    },
+    "94": {
+      "jitter": 0.6149935722351074,
+      "token_text": " The"
+    },
+    "95": {
+      "jitter": 0.21960262954235077,
+      "token_text": " gir"
+    },
+    "96": {
+      "jitter": 0.2847575843334198,
+      "token_text": "aff"
+    },
+    "97": {
+      "jitter": 0.25612038373947144,
+      "token_text": "es"
+    },
+    "98": {
+      "jitter": 0.3974625915288925,
+      "token_text": " are"
+    },
+    "99": {
+      "jitter": 0.34897951781749725,
+      "token_text": " also"
+    },
+    "100": {
+      "jitter": 0.2898384928703308,
+      "token_text": " scattered"
+    },
+    "101": {
+      "jitter": 0.36251290142536163,
+      "token_text": " across"
+    },
+    "102": {
+      "jitter": 0.20250056684017181,
+      "token_text": " the"
+    },
+    "103": {
+      "jitter": 0.39843930304050446,
+      "token_text": " image"
+    },
+    "104": {
+      "jitter": 0.1668683886528015,
+      "token_text": ","
+    },
+    "105": {
+      "jitter": 0.20291028916835785,
+      "token_text": " with"
+    },
+    "106": {
+      "jitter": 0.19954101741313934,
+      "token_text": " two"
+    },
+    "107": {
+      "jitter": 0.13284096121788025,
+      "token_text": " on"
+    },
+    "108": {
+      "jitter": 0.24339142441749573,
+      "token_text": " the"
+    },
+    "109": {
+      "jitter": 0.28250737488269806,
+      "token_text": " left"
+    },
+    "110": {
+      "jitter": 0.13452394306659698,
+      "token_text": " side"
+    },
+    "111": {
+      "jitter": 0.33991171419620514,
+      "token_text": ","
+    },
+    "112": {
+      "jitter": 0.5119072496891022,
+      "token_text": " two"
+    },
+    "113": {
+      "jitter": 0.33492983877658844,
+      "token_text": " in"
+    },
+    "114": {
+      "jitter": 0.4944244921207428,
+      "token_text": " the"
+    },
+    "115": {
+      "jitter": 0.3440289944410324,
+      "token_text": " middle"
+    },
+    "116": {
+      "jitter": 0.6674901247024536,
+      "token_text": ","
+    },
+    "117": {
+      "jitter": 0.7602929025888443,
+      "token_text": " and"
+    },
+    "118": {
+      "jitter": 0.667111948132515,
+      "token_text": " two"
+    },
+    "119": {
+      "jitter": 0.16266918182373047,
+      "token_text": " on"
+    },
+    "120": {
+      "jitter": 0.1250665932893753,
+      "token_text": " the"
+    },
+    "121": {
+      "jitter": 0.22976472228765488,
+      "token_text": " right"
+    },
+    "122": {
+      "jitter": 0.1809561923146248,
+      "token_text": " side"
+    },
+    "123": {
+      "jitter": 0.09050954878330231,
+      "token_text": " of"
+    },
+    "124": {
+      "jitter": 0.29694896936416626,
+      "token_text": " the"
+    },
+    "125": {
+      "jitter": 0.22033655643463135,
+      "token_text": " image"
+    },
+    "126": {
+      "jitter": 0.0,
+      "token_text": "."
+    },
+    "127": {
+      "jitter": 0.0,
+      "token_text": "<|eot_id|>"
+    }
+  },
+  "inconsistent_token": [
+    {
+      "token_id": 6,
+      "token_text": " six"
+    },
+    {
+      "token_id": 7,
+      "token_text": " gir"
+    },
+    {
+      "token_id": 8,
+      "token_text": "aff"
+    },
+    {
+      "token_id": 9,
+      "token_text": "es"
+    },
+    {
+      "token_id": 11,
+      "token_text": " four"
+    },
+    {
+      "token_id": 12,
+      "token_text": " z"
+    },
+    {
+      "token_id": 13,
+      "token_text": "eb"
+    },
+    {
+      "token_id": 14,
+      "token_text": "ras"
+    },
+    {
+      "token_id": 27,
+      "token_text": " two"
+    },
+    {
+      "token_id": 28,
+      "token_text": " of"
+    },
+    {
+      "token_id": 29,
+      "token_text": " them"
+    },
+    {
+      "token_id": 30,
+      "token_text": " standing"
+    },
+    {
+      "token_id": 31,
+      "token_text": " closer"
+    },
+    {
+      "token_id": 32,
+      "token_text": " to"
+    },
+    {
+      "token_id": 33,
+      "token_text": " the"
+    },
+    {
+      "token_id": 34,
+      "token_text": " camera"
+    },
+    {
+      "token_id": 35,
+      "token_text": " and"
+    },
+    {
+      "token_id": 36,
+      "token_text": " two"
+    },
+    {
+      "token_id": 37,
+      "token_text": " further"
+    },
+    {
+      "token_id": 38,
+      "token_text": " away"
+    },
+    {
+      "token_id": 82,
+      "token_text": " two"
+    },
+    {
+      "token_id": 83,
+      "token_text": " in"
+    },
+    {
+      "token_id": 84,
+      "token_text": " the"
+    },
+    {
+      "token_id": 85,
+      "token_text": " middle"
+    },
+    {
+      "token_id": 106,
+      "token_text": " two"
+    },
+    {
+      "token_id": 107,
+      "token_text": " on"
+    },
+    {
+      "token_id": 108,
+      "token_text": " the"
+    },
+    {
+      "token_id": 109,
+      "token_text": " left"
+    },
+    {
+      "token_id": 110,
+      "token_text": " side"
+    }
+  ],
+  "fine_grained_token": [
+    {
+      "token_id": 16,
+      "token_text": " The"
+    },
+    {
+      "token_id": 17,
+      "token_text": " gir"
+    },
+    {
+      "token_id": 18,
+      "token_text": "aff"
+    },
+    {
+      "token_id": 19,
+      "token_text": "es"
+    },
+    {
+      "token_id": 20,
+      "token_text": " are"
+    },
+    {
+      "token_id": 21,
+      "token_text": " positioned"
+    },
+    {
+      "token_id": 22,
+      "token_text": " in"
+    },
+    {
+      "token_id": 23,
+      "token_text": " the"
+    },
+    {
+      "token_id": 24,
+      "token_text": " background"
+    },
+    {
+      "token_id": 40,
+      "token_text": " The"
+    },
+    {
+      "token_id": 41,
+      "token_text": " z"
+    },
+    {
+      "token_id": 42,
+      "token_text": "eb"
+    },
+    {
+      "token_id": 43,
+      "token_text": "ras"
+    },
+    {
+      "token_id": 44,
+      "token_text": " are"
+    },
+    {
+      "token_id": 45,
+      "token_text": " positioned"
+    },
+    {
+      "token_id": 46,
+      "token_text": " in"
+    },
+    {
+      "token_id": 47,
+      "token_text": " the"
+    },
+    {
+      "token_id": 48,
+      "token_text": " foreground"
+    },
+    {
+      "token_id": 74,
+      "token_text": " with"
+    },
+    {
+      "token_id": 75,
+      "token_text": " one"
+    },
+    {
+      "token_id": 76,
+      "token_text": " zebra"
+    },
+    {
+      "token_id": 77,
+      "token_text": " on"
+    },
+    {
+      "token_id": 78,
+      "token_text": " the"
+    },
+    {
+      "token_id": 79,
+      "token_text": " left"
+    },
+    {
+      "token_id": 80,
+      "token_text": " side"
+    },
+    {
+      "token_id": 82,
+      "token_text": " two"
+    },
+    {
+      "token_id": 83,
+      "token_text": " in"
+    },
+    {
+      "token_id": 84,
+      "token_text": " the"
+    },
+    {
+      "token_id": 85,
+      "token_text": " middle"
+    },
+    {
+      "token_id": 88,
+      "token_text": " one"
+    },
+    {
+      "token_id": 89,
+      "token_text": " on"
+    },
+    {
+      "token_id": 90,
+      "token_text": " the"
+    },
+    {
+      "token_id": 91,
+      "token_text": " right"
+    },
+    {
+      "token_id": 92,
+      "token_text": " side"
+    },
+    {
+      "token_id": 118,
+      "token_text": " two"
+    },
+    {
+      "token_id": 119,
+      "token_text": " on"
+    },
+    {
+      "token_id": 120,
+      "token_text": " the"
+    },
+    {
+      "token_id": 121,
+      "token_text": " right"
+    },
+    {
+      "token_id": 122,
+      "token_text": " side"
+    },
+    {
+      "token_id": 123,
+      "token_text": " of"
+    },
+    {
+      "token_id": 124,
+      "token_text": " the"
+    },
+    {
+      "token_id": 125,
+      "token_text": " image"
+    }
+  ],
+  "statistics": {
+    "all_tokens_mean": 0.20348582492442802,
+    "inconsistent_tokens_mean": 0.23199984585416727,
+    "fine_grained_tokens_mean": 0.1890089190786793,
+    "marked_tokens_mean": 0.2065685933954279,
+    "max_jitter": 0.971563994884491,
+    "min_jitter": 0.0
+  }
+}
