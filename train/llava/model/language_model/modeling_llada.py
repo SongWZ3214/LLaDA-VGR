@@ -1300,7 +1300,8 @@ class LLaDAModelLM(LLaDAPreTrainedModel):
 
     @torch.no_grad()
     def generate_with_embeds(self, inputs_embeds, steps=128, gen_length=128, block_length=128, temperature=0.,
-        cfg_scale=0., remasking='low_confidence', mask_id=126336, tokenizer=None, stopping_criteria=None, generation_suffix=None, **kwargs):
+        cfg_scale=0., remasking='low_confidence', mask_id=126336, tokenizer=None, stopping_criteria=None, generation_suffix=None, 
+        return_confidences=False, save_confidence_interval=None, is_initial_generation=True, text_token_ids=None, **kwargs):
         '''
         Args:
             inputs_embeds: A tensor of shape (1, l, d).
@@ -1313,6 +1314,7 @@ class LLaDAModelLM(LLaDAPreTrainedModel):
             mask_id: The toke id of [MASK] is 126336.
             generation_suffix: (str or None) Generation suffix, such as "The answer is xxx", will be appended to the end
         '''
+        print(f'is_initial_generation: {is_initial_generation}')
         # Use mixed precision for faster computation
         with torch.cuda.amp.autocast(enabled=True):
             # Handle generation suffix
@@ -1329,29 +1331,90 @@ class LLaDAModelLM(LLaDAPreTrainedModel):
             else:
                 suffix_len = 0
 
-            # Create input in embedding space
-            total_length = inputs_embeds.shape[1] + gen_length + suffix_len
             masked_embed = self.model.embed_tokens(torch.tensor([mask_id]).to(inputs_embeds.device)) # shape (1, d)
-            x_embeds = masked_embed.repeat(1, total_length, 1).to(inputs_embeds.device) # shape (1, l + gen_length + suffix_len, d)
-            x_embeds[:, :inputs_embeds.shape[1]] = inputs_embeds.clone()
-            if suffix_embeds is not None:
-                x_embeds[:, -suffix_len:] = suffix_embeds
 
-            # Create a tracking tensor for token IDs for final output
-            x = torch.full((1, total_length), mask_id, dtype=torch.long, device=inputs_embeds.device)
-            if suffix_token_ids is not None:
-                x[:, -suffix_len:] = suffix_token_ids
+            # 判断是初次生成还是迭代修改
+            if is_initial_generation:
+                # === 初次生成逻辑 ===
+                # Create input in embedding space
+                total_length = inputs_embeds.shape[1] + gen_length + suffix_len
+                x_embeds = masked_embed.repeat(1, total_length, 1).to(inputs_embeds.device) # shape (1, l + gen_length + suffix_len, d)
+                x_embeds[:, :inputs_embeds.shape[1]] = inputs_embeds.clone()
+                if suffix_embeds is not None:
+                    x_embeds[:, -suffix_len:] = suffix_embeds
+
+                # Create a tracking tensor for token IDs for final output
+                x = torch.full((1, total_length), mask_id, dtype=torch.long, device=inputs_embeds.device)
+                if suffix_token_ids is not None:
+                    x[:, -suffix_len:] = suffix_token_ids
+            else:
+                # === 迭代修改（Inpainting/Restoration）逻辑 ===
+                if text_token_ids is None:
+                    raise ValueError("text_token_ids must be provided when is_initial_generation=False")
+                
+                # 1. 统一转换为 Tensor 并确保维度为 (1, L)
+                if not isinstance(text_token_ids, torch.Tensor):
+                    text_token_ids = torch.tensor(text_token_ids, dtype=torch.long, device=inputs_embeds.device)
+                else:
+                    text_token_ids = text_token_ids.to(inputs_embeds.device)
+                
+                if text_token_ids.dim() == 1:
+                    text_token_ids = text_token_ids.unsqueeze(0)
+
+                # 2. 处理 Padding 以对齐 block_length [关键修正]
+                raw_text_len = text_token_ids.shape[1]
+                remainder = raw_text_len % block_length
+                if remainder != 0:
+                    pad_len = block_length - remainder
+                    # 使用 EOS 或 0 进行填充，绝对不能用 mask_id，否则会被当作需要生成的区域
+                    pad_id = tokenizer.eos_token_id if tokenizer is not None and hasattr(tokenizer, 'eos_token_id') else 0 
+                    padding = torch.full((1, pad_len), pad_id, dtype=torch.long, device=inputs_embeds.device)
+                    text_token_ids = torch.cat([text_token_ids, padding], dim=1)
+                
+                text_len = text_token_ids.shape[1] # 更新后的长度（已对齐）
+                
+                # 计算总长度
+                total_length = inputs_embeds.shape[1] + text_len + suffix_len
+                
+                # 将text转换为embeddings
+                text_embeds = self.model.embed_tokens(text_token_ids)
+                
+                # 创建 x_embeds
+                x_embeds = torch.zeros((1, total_length, inputs_embeds.shape[-1]), dtype=inputs_embeds.dtype, device=inputs_embeds.device)
+                x_embeds[:, :inputs_embeds.shape[1]] = inputs_embeds.clone()
+                x_embeds[:, inputs_embeds.shape[1]:inputs_embeds.shape[1] + text_len] = text_embeds
+                if suffix_embeds is not None:
+                    x_embeds[:, -suffix_len:] = suffix_embeds
+                
+                # 创建 tracking tensor x
+                x = torch.zeros((1, total_length), dtype=torch.long, device=inputs_embeds.device)
+                # Prompt 部分填充 mask_id (防止索引越界，虽然会被 prompt_index 掩盖)
+                x[:, :inputs_embeds.shape[1]] = mask_id 
+                # Text 部分
+                x[:, inputs_embeds.shape[1]:inputs_embeds.shape[1] + text_len] = text_token_ids
+                # Suffix 部分
+                if suffix_token_ids is not None:
+                    x[:, -suffix_len:] = suffix_token_ids
+                
+                # 更新 gen_length 为对齐后的 text_len
+                gen_length = text_len
 
             # prompt_index: A tensor of shape (1, l + gen_length + suffix_len) where the first l elements are 1 (representing the prompt) 
             # and the remaining gen_length+suffix_len elements are 0 (representing the generated part)
             prompt_index = torch.zeros((1, total_length), dtype=torch.bool, device=inputs_embeds.device)
             prompt_index[:, :inputs_embeds.shape[1]] = 1 # shape (1, l + gen_length + suffix_len)
 
+            # Create tracking tensor for token confidences
+            token_confidences = torch.zeros((1, total_length), dtype=torch.float32, device=inputs_embeds.device)
+            
+            # 用于存储中间置信度历史（如果启用）
+            intermediate_confidence_history = [] if save_confidence_interval is not None else None
+
             assert gen_length % block_length == 0
             num_blocks = gen_length // block_length
 
             assert steps % num_blocks == 0
-            steps = steps // num_blocks
+            steps_per_block = steps // num_blocks  # 重命名变量避免混淆
 
             # New: Initialize stop position variable (default to maximum length)
             stop_position = inputs_embeds.shape[1] + gen_length
@@ -1379,9 +1442,9 @@ class LLaDAModelLM(LLaDAPreTrainedModel):
                 block_embeds = x_embeds[:, block_start:block_end]
                 block_mask_index = torch.all(torch.abs(block_embeds - masked_embed) < 1e-5, dim=2)
                 
-                num_transfer_tokens = self.get_num_transfer_tokens(block_mask_index, steps)
+                num_transfer_tokens = self.get_num_transfer_tokens(block_mask_index, steps_per_block)
                 
-                for i in range(steps):
+                for i in range(steps_per_block):
                     # Determine which positions are mask embeddings
                     mask_index = torch.all(torch.abs(x_embeds - masked_embed) < 1e-5, dim=2)
 
@@ -1461,6 +1524,64 @@ class LLaDAModelLM(LLaDAPreTrainedModel):
                     # Update embeddings and token IDs
                     x_embeds[transfer_index] = x0_embeds[transfer_index]
                     x[transfer_index] = x0[transfer_index]
+                    
+                    # Update token confidences for transferred positions
+                    if remasking == 'low_confidence':
+                        p_float32 = F.softmax(logits.to(torch.float32), dim=-1)
+                        # Get probability of selected token at each position
+                        token_probs = torch.squeeze(torch.gather(p_float32, dim=-1, index=torch.unsqueeze(x0, -1)), -1).float()
+                        # Set probability to 1.0 for non-mask positions (already fixed tokens)
+                        token_probs = torch.where(mask_index, token_probs, torch.ones_like(token_probs))
+                    else:
+                        # For random remasking, use the random values as confidence
+                        token_probs = torch.where(mask_index, x0_p.float(), torch.ones_like(x0_p).float())
+                    
+                    token_confidences[transfer_index] = token_probs[transfer_index]
+
+                    # 每隔k步保存一次置信度（如果启用）
+                    if save_confidence_interval is not None and i % save_confidence_interval == 0:
+                        # 获取当前所有token和置信度（包括mask）
+                        current_tokens = x[0, inputs_embeds.shape[1]:inputs_embeds.shape[1] + gen_length].cpu().numpy().tolist()
+                        current_confidences = token_confidences[0, inputs_embeds.shape[1]:inputs_embeds.shape[1] + gen_length].cpu().numpy().tolist()
+                        
+                        # 标注每个token的状态：'mask' 或 'decoded'
+                        token_states = []
+                        for token in current_tokens:
+                            if token == mask_id:
+                                token_states.append('mask')
+                            else:
+                                token_states.append('decoded')
+                        
+                        # 对mask的token，计算当前步骤的置信度
+                        # 需要从logits中获取mask位置的置信度
+                        if remasking == 'low_confidence':
+                            # 使用softmax计算概率
+                            # 全量前向传播的情况：logits包含所有位置
+                            current_logits = logits[0, inputs_embeds.shape[1]:inputs_embeds.shape[1] + gen_length, :]
+                            current_x0 = x0[0, inputs_embeds.shape[1]:inputs_embeds.shape[1] + gen_length]
+                            
+                            # 计算所有位置的置信度
+                            p = F.softmax(current_logits.to(torch.float32), dim=-1)
+                            
+                            # 对于mask位置，获取当前预测token的置信度
+                            for idx, (token, state) in enumerate(zip(current_tokens, token_states)):
+                                if state == 'mask' and idx < current_logits.shape[0]:
+                                    # 获取当前预测的token（即x0中对应位置的token）
+                                    predicted_token = current_x0[idx].item()
+                                    if predicted_token != mask_id and idx < p.shape[0]:
+                                        # 获取预测token的置信度
+                                        mask_confidence = p[idx, predicted_token].item()
+                                        current_confidences[idx] = float(mask_confidence)
+                        # 如果remasking是random，mask的置信度保持为0或随机值
+                        
+                        # 保存所有token，包括mask和已解码的
+                        intermediate_confidence_history.append({
+                            'step': i,
+                            'block': num_block,
+                            'tokens': current_tokens,  # 所有token，包括mask
+                            'confidences': current_confidences,  # 所有置信度（包括mask的置信度）
+                            'token_states': token_states  # 每个token的状态：'mask' 或 'decoded'
+                        })
 
                     # New: Check for stop words after each update
                     if stopping_criteria is not None:
@@ -1486,21 +1607,25 @@ class LLaDAModelLM(LLaDAPreTrainedModel):
 
             # Return the generated result, up to stop_position, and append the suffix
             if found_stop_seq:
-                if suffix_len > 0:
-                    return torch.cat([
-                        x[:, inputs_embeds.shape[1]:stop_position], 
-                        x[:, -suffix_len:]
-                    ], dim=1)
-                else:
-                    return x[:, inputs_embeds.shape[1]:stop_position]
+                final_end = stop_position
             else:
-                if suffix_len > 0:
-                    return torch.cat([
-                        x[:, inputs_embeds.shape[1]:inputs_embeds.shape[1]+gen_length], 
-                        x[:, -suffix_len:]
-                    ], dim=1)
+                final_end = inputs_embeds.shape[1] + gen_length  # 这里可能包含了 padding
+            
+            generated_tokens = x[:, inputs_embeds.shape[1]:final_end]
+            generated_confidences = token_confidences[:, inputs_embeds.shape[1]:final_end]
+            
+            if suffix_len > 0:
+                generated_tokens = torch.cat([generated_tokens, x[:, -suffix_len:]], dim=1)
+                generated_confidences = torch.cat([generated_confidences, torch.ones((1, suffix_len), dtype=torch.float32, device=generated_confidences.device)], dim=1)
+            
+            # Return tuple: (tokens, confidences) or (tokens, confidences, intermediate_history)
+            if return_confidences:
+                if intermediate_confidence_history is not None and len(intermediate_confidence_history) > 0:
+                    return generated_tokens, generated_confidences, intermediate_confidence_history
                 else:
-                    return x[:, inputs_embeds.shape[1]:inputs_embeds.shape[1]+gen_length]
+                    return generated_tokens, generated_confidences
+            else:
+                return generated_tokens
 
 
     @add_start_docstrings_to_model_forward(LLaDA_INPUTS_DOCSTRING)

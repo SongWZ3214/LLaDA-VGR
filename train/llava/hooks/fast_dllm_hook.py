@@ -156,6 +156,8 @@ class FastDLLMGenerationHook:
         image_sizes: Optional[torch.Tensor] = None,
         modalities: Optional[List[str]] = ["image"],
         return_confidences: bool = False,
+        is_initial_generation: bool = True,  # 新增参数：判断是初次生成还是迭代修改
+        text_token_ids: Optional[torch.Tensor] = None,  # 新增参数：text的token ID序列
         **kwargs,
     ):
         modalities = kwargs.pop("modalities", None) if "modalities" in kwargs and modalities is None else modalities
@@ -168,7 +170,12 @@ class FastDLLMGenerationHook:
             (inputs, position_ids, attention_mask, _, inputs_embeds, _) = self.model.prepare_inputs_labels_for_multimodal(inputs, position_ids, attention_mask, None, None, images, modalities, image_sizes=image_sizes)
         else:
             inputs_embeds = self.model.get_model().embed_tokens(inputs)
-        output = self._fast_generate_with_embeds(inputs_embeds=inputs_embeds, **kwargs)
+        output = self._fast_generate_with_embeds(
+            inputs_embeds=inputs_embeds, 
+            is_initial_generation=is_initial_generation,
+            text_token_ids=text_token_ids,
+            **kwargs
+        )
         
         # _fast_generate_with_embeds now returns (tokens, confidences) or (tokens, confidences, intermediate_history)
         # If return_confidences is False, only return tokens for backward compatibility
@@ -196,13 +203,17 @@ class FastDLLMGenerationHook:
         generation_suffix=None, 
         threshold=None, 
         prefix_refresh_interval=32, 
-        save_confidence_interval=None,  # 每隔k步保存一次置信度，None表示不保存
+        save_confidence_interval=None, 
+        is_initial_generation=True, 
+        text_token_ids=None, 
         **kwargs
     ):
         """
         Fast generation with embeddings using dLLM cache optimization.
-        This method incorporates all fast dLLM related optimizations.
         """
+        # 1. 变量初始化，防止 UnboundLocalError
+        fast_dllm_cache = [] 
+
         # Use mixed precision for faster computation
         with torch.cuda.amp.autocast(enabled=True):
             # Handle generation suffix
@@ -215,24 +226,76 @@ class FastDLLMGenerationHook:
                 suffix_embeds = self.model.model.embed_tokens(suffix_token_ids)
                 suffix_len = suffix_embeds.shape[1]
 
-            # Create input in embedding space
-            total_length = inputs_embeds.shape[1] + gen_length + suffix_len
             masked_embed = self.model.model.embed_tokens(torch.tensor([mask_id]).to(inputs_embeds.device))
-            x_embeds = masked_embed.repeat(1, total_length, 1).to(inputs_embeds.device)
-            x_embeds[:, :inputs_embeds.shape[1]] = inputs_embeds.clone()
-            if suffix_embeds is not None:
-                x_embeds[:, -suffix_len:] = suffix_embeds
 
-            # Create tracking tensor for token IDs
-            x = torch.full((1, total_length), mask_id, dtype=torch.long, device=inputs_embeds.device)
-            if suffix_token_ids is not None:
-                x[:, -suffix_len:] = suffix_token_ids
+            # 判断是初次生成还是迭代修改
+            if is_initial_generation:
+                # === 初次生成逻辑 ===
+                total_length = inputs_embeds.shape[1] + gen_length + suffix_len
+                x_embeds = masked_embed.repeat(1, total_length, 1).to(inputs_embeds.device)
+                x_embeds[:, :inputs_embeds.shape[1]] = inputs_embeds.clone()
+                if suffix_embeds is not None:
+                    x_embeds[:, -suffix_len:] = suffix_embeds
 
-            # Create tracking tensor for token confidences
-            # Store the final confidence for each token position
+                x = torch.full((1, total_length), mask_id, dtype=torch.long, device=inputs_embeds.device)
+                if suffix_token_ids is not None:
+                    x[:, -suffix_len:] = suffix_token_ids
+            else:
+                # === 迭代修改（Inpainting/Restoration）逻辑 ===
+                if text_token_ids is None:
+                    raise ValueError("text_token_ids must be provided when is_initial_generation=False")
+                
+                # 1. 统一转换为 Tensor 并确保维度为 (1, L)
+                if not isinstance(text_token_ids, torch.Tensor):
+                    text_token_ids = torch.tensor(text_token_ids, dtype=torch.long, device=inputs_embeds.device)
+                else:
+                    text_token_ids = text_token_ids.to(inputs_embeds.device)
+                
+                if text_token_ids.dim() == 1:
+                    text_token_ids = text_token_ids.unsqueeze(0)
+
+                # 2. 处理 Padding 以对齐 block_length [关键修正]
+                raw_text_len = text_token_ids.shape[1]
+                remainder = raw_text_len % block_length
+                if remainder != 0:
+                    pad_len = block_length - remainder
+                    # 使用 EOS 或 0 进行填充，绝对不能用 mask_id，否则会被当作需要生成的区域
+                    pad_id = tokenizer.eos_token_id if tokenizer is not None else 0 
+                    padding = torch.full((1, pad_len), pad_id, dtype=torch.long, device=inputs_embeds.device)
+                    text_token_ids = torch.cat([text_token_ids, padding], dim=1)
+                
+                text_len = text_token_ids.shape[1] # 更新后的长度（已对齐）
+                
+                # 计算总长度
+                total_length = inputs_embeds.shape[1] + text_len + suffix_len
+                
+                # 将text转换为embeddings
+                text_embeds = self.model.model.embed_tokens(text_token_ids)
+                
+                # 创建 x_embeds
+                # 注意：这里直接使用 zero 初始化，然后填充部分。
+                # 关键点：对于 text_token_ids 中本身就是 mask_id 的位置，embed_tokens 会生成 mask embedding，
+                # 后续的 mask_index 检测逻辑依然有效。
+                x_embeds = torch.zeros((1, total_length, inputs_embeds.shape[-1]), dtype=inputs_embeds.dtype, device=inputs_embeds.device)
+                x_embeds[:, :inputs_embeds.shape[1]] = inputs_embeds.clone()
+                x_embeds[:, inputs_embeds.shape[1]:inputs_embeds.shape[1] + text_len] = text_embeds
+                if suffix_embeds is not None:
+                    x_embeds[:, -suffix_len:] = suffix_embeds
+                
+                # 创建 tracking tensor x
+                x = torch.zeros((1, total_length), dtype=torch.long, device=inputs_embeds.device)
+                # Prompt 部分填充 mask_id (防止索引越界，虽然会被 prompt_index 掩盖)
+                x[:, :inputs_embeds.shape[1]] = mask_id 
+                # Text 部分
+                x[:, inputs_embeds.shape[1]:inputs_embeds.shape[1] + text_len] = text_token_ids
+                # Suffix 部分
+                if suffix_token_ids is not None:
+                    x[:, -suffix_len:] = suffix_token_ids
+                
+                # 更新 gen_length 为对齐后的 text_len
+                gen_length = text_len
+
             token_confidences = torch.zeros((1, total_length), dtype=torch.float32, device=inputs_embeds.device)
-            
-            # 用于存储中间置信度历史（如果启用）
             intermediate_confidence_history = [] if save_confidence_interval is not None else None
 
             # Prompt index tracking
@@ -242,9 +305,10 @@ class FastDLLMGenerationHook:
             assert gen_length % block_length == 0
             num_blocks = gen_length // block_length
             assert steps % num_blocks == 0
-            steps = steps // num_blocks
+            steps_per_block = steps // num_blocks # 重命名变量避免混淆
 
             # Initialize stop tracking
+            # 注意：如果进行了 padding，stop_position 实际上可能在 padding 之前
             stop_position = inputs_embeds.shape[1] + gen_length
             found_stop_seq = False
             stop_tokens = []
@@ -264,18 +328,22 @@ class FastDLLMGenerationHook:
                 if found_stop_seq and stop_position <= block_start:
                     break
                 
+                # 只有当 block 里包含 mask 时才进行 num_transfer_tokens 的计算
+                # 这里的逻辑是：如果该 block 全是固定文本（非 mask），我们依然需要跑 forward pass 来更新 cache，但不需要采样
                 block_embeds = x_embeds[:, block_start:block_end]
                 block_mask_index = torch.all(torch.abs(block_embeds - masked_embed) < 1e-5, dim=2)
-                num_transfer_tokens = self._get_num_transfer_tokens(block_mask_index, steps)
                 
+                # 只有 mask 的位置需要计算 transfer schedule
+                num_transfer_tokens = self._get_num_transfer_tokens(block_mask_index, steps_per_block)
+                # print(f"num_transfer_tokens: {num_transfer_tokens}")
                 
                 i = 0
 
                 while True:
-                    if threshold is None and i >= steps:
+                    if threshold is None and i >= steps_per_block:
                         break
                     
-                    # Check mask state
+                    # Check mask state (Global check)
                     mask_index = torch.all(torch.abs(x_embeds - masked_embed) < 1e-5, dim=2)
                     
                     if found_stop_seq:
@@ -283,9 +351,17 @@ class FastDLLMGenerationHook:
                         if not pre_stop_masks.any():
                             break
                     
+                    # 优化：如果在迭代修改模式下，当前 block 没有 mask，直接跳过生成步骤，
+                    # 但必须执行一次 forward pass 来更新 fast_dllm_cache (如果使用的是 cache 模式)
                     current_block_masks = mask_index[0, block_start:block_end]
                     if not current_block_masks.any():
-                        break
+                        # 即便没有 mask，也需要跑一次 forward 来填充 KV cache，供后续 block 使用
+                        # 除非这一块的 cache 已经存在。这里为了保险，通常跑一次 forward
+                        if i == 0: 
+                             # 只跑一次 forward 即可跳出内层循环
+                             pass 
+                        else:
+                             break
                     
                     # Handle CFG
                     if cfg_scale > 0.0:
@@ -303,7 +379,7 @@ class FastDLLMGenerationHook:
                         logits = un_logits + (cfg_scale + 1) * (logits - un_logits)
                     else:
                         if i % prefix_refresh_interval == 0:
-                            fast_dllm_cache = []
+                            fast_dllm_cache = [] # 清空 cache 重新计算
                             outputs = self.model.model(
                                 inputs_embeds=x_embeds,
                                 fast_dllm_cache=fast_dllm_cache
@@ -313,7 +389,7 @@ class FastDLLMGenerationHook:
                         else:
                             # Incremental forward pass
                             outputs = self.model.model(
-                                inputs_embeds=x_embeds[:, block_start:],
+                                inputs_embeds=x_embeds[:, block_start:], # 这里利用了 cache
                                 fast_dllm_cache=fast_dllm_cache
                             )
                         logits = self.model.lm_head(outputs[0]).float()
@@ -328,23 +404,29 @@ class FastDLLMGenerationHook:
                             logits[:, :, token_id] = torch.where(mask_index[:, block_start:], -float('inf'), logits[:, :, token_id])
 
                     # Get transfer indices and update
+                    # 确保传递给 _get_transfer_index 的 num_transfer_tokens 是正确的 step 切片
+                    current_num_transfer = num_transfer_tokens[:, i] if (threshold is None and i < num_transfer_tokens.shape[1]) else None
+                    # print(f"i: {i}")
+                    # print(f"current_num_transfer: {current_num_transfer}")
                     if i % prefix_refresh_interval == 0:
                         x0, transfer_index, token_probs = self._get_transfer_index(
                             logits, temperature, remasking, mask_index, x,
-                            num_transfer_tokens[:, i] if threshold is None else None,
+                            current_num_transfer,
                             found_stop_seq, stop_position, block_end, suffix_len, threshold,
                             return_confidence=True
                         )
+                        # 全局更新
                         x0_embeds = self.model.model.embed_tokens(x0)
                         x0_embeds = torch.where(mask_index.unsqueeze(-1).expand_as(x_embeds), x0_embeds, x_embeds)
                         x_embeds[transfer_index] = x0_embeds[transfer_index]
                         x[transfer_index] = x0[transfer_index]
-                        # Update token confidences for transferred positions
                         token_confidences[transfer_index] = token_probs[transfer_index]
                     else:
+                        # 局部更新 (针对当前 block 及之后)
+                        # 注意：logits 在非 refresh 步只包含从 block_start 开始的部分
                         x0, transfer_index, token_probs = self._get_transfer_index(
                             logits, temperature, remasking, mask_index[:, block_start:], x[:, block_start:],
-                            num_transfer_tokens[:, i] if threshold is None else None,
+                            current_num_transfer,
                             found_stop_seq, stop_position - block_start, block_end - block_start, suffix_len, threshold,
                             return_confidence=True
                         )
@@ -437,22 +519,22 @@ class FastDLLMGenerationHook:
                 if threshold is not None:
                     print(f'Number of steps: {i}')
 
-            # Return results with confidences
+            # Return results
+            # 注意：如果有 Padding，返回时最好去掉 Padding 部分
+            # 这里简单处理，返回全部，由调用者截断，或者在这里基于 stop_position 截断
             if found_stop_seq:
-                generated_tokens = x[:, inputs_embeds.shape[1]:stop_position]
-                generated_confidences = token_confidences[:, inputs_embeds.shape[1]:stop_position]
-                if suffix_len > 0:
-                    generated_tokens = torch.cat([generated_tokens, x[:, -suffix_len:]], dim=1)
-                    generated_confidences = torch.cat([generated_confidences, torch.ones((1, suffix_len), dtype=torch.float32, device=generated_confidences.device)], dim=1)
+                final_end = stop_position
             else:
-                generated_tokens = x[:, inputs_embeds.shape[1]:inputs_embeds.shape[1] + gen_length]
-                generated_confidences = token_confidences[:, inputs_embeds.shape[1]:inputs_embeds.shape[1] + gen_length]
-                if suffix_len > 0:
-                    generated_tokens = torch.cat([generated_tokens, x[:, -suffix_len:]], dim=1)
-                    generated_confidences = torch.cat([generated_confidences, torch.ones((1, suffix_len), dtype=torch.float32, device=generated_confidences.device)], dim=1)
+                final_end = inputs_embeds.shape[1] + gen_length # 这里可能包含了 padding
             
-            # Return tuple: (generated_tokens, token_confidences) 或 (generated_tokens, token_confidences, intermediate_confidence_history)
-            if intermediate_confidence_history is not None and len(intermediate_confidence_history) > 0:
+            generated_tokens = x[:, inputs_embeds.shape[1]:final_end]
+            generated_confidences = token_confidences[:, inputs_embeds.shape[1]:final_end]
+            
+            if suffix_len > 0:
+                generated_tokens = torch.cat([generated_tokens, x[:, -suffix_len:]], dim=1)
+                generated_confidences = torch.cat([generated_confidences, torch.ones((1, suffix_len), dtype=torch.float32, device=generated_confidences.device)], dim=1)
+            
+            if intermediate_confidence_history is not None:
                 return generated_tokens, generated_confidences, intermediate_confidence_history
             else:
                 return generated_tokens, generated_confidences
