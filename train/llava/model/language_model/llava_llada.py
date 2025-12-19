@@ -62,6 +62,13 @@ class LlavaLLaDAModelLM(LLaDAModelLM, LlavaMetaForCausalLM):
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         # Initialize weights and apply final processing
         self.post_init()
+        
+        # Revise 训练模式标志
+        self.revise = False
+    
+    def decide_revise(self, revise):
+        """设置是否启用 revise 训练模式"""
+        self.revise = revise
 
     def get_model(self):
         return self.model
@@ -83,13 +90,15 @@ class LlavaLLaDAModelLM(LLaDAModelLM, LlavaMetaForCausalLM):
         modalities: Optional[List[str]] = ["image"],
         dpo_forward: Optional[bool] = None,
         cache_position=None,
+        revise_indices: Optional[torch.Tensor] = None,
+        **kwargs,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
         if inputs_embeds is None and attention_mask is not None:
             # donate multi-dialogue 
-            (input_ids, position_ids, attention_mask, past_key_values, inputs_embeds, labels, conversation_ids) = self.prepare_inputs_labels_for_multimodal(input_ids, position_ids, attention_mask, past_key_values, labels, images, modalities, image_sizes, is_llada=True)
+            (input_ids, position_ids, attention_mask, past_key_values, inputs_embeds, labels, conversation_ids, revise_indices) = self.prepare_inputs_labels_for_multimodal(input_ids, position_ids, attention_mask, past_key_values, labels, images, modalities, image_sizes, is_llada=True, revise_indices=revise_indices)
         elif inputs_embeds is None:
-            (input_ids, position_ids, attention_mask, past_key_values, inputs_embeds, labels) = self.prepare_inputs_labels_for_multimodal(input_ids, position_ids, attention_mask, past_key_values, labels, images, modalities, image_sizes)
+            (input_ids, position_ids, attention_mask, past_key_values, inputs_embeds, labels, revise_indices) = self.prepare_inputs_labels_for_multimodal(input_ids, position_ids, attention_mask, past_key_values, labels, images, modalities, image_sizes, revise_indices=revise_indices)
             conversation_ids = None
         if dpo_forward:
             outputs = self.model(
@@ -109,6 +118,10 @@ class LlavaLLaDAModelLM(LLaDAModelLM, LlavaMetaForCausalLM):
             return logits, labels
 
         else:
+            # 从实例属性获取 revise 标志
+            revise = getattr(self, 'revise', False)
+            # revise_indices 会通过 kwargs 传递（从 batch 中）
+            # 但由于 forward 签名中没有 revise_indices，需要通过 **kwargs 传递
             return super().forward(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
@@ -121,6 +134,8 @@ class LlavaLLaDAModelLM(LLaDAModelLM, LlavaMetaForCausalLM):
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
                 conversation_ids=conversation_ids,
+                revise=revise,
+                revise_indices=revise_indices,  # 从函数参数中获取
             )
 
     @torch.no_grad()
@@ -139,7 +154,7 @@ class LlavaLLaDAModelLM(LLaDAModelLM, LlavaMetaForCausalLM):
             raise NotImplementedError("`inputs_embeds` is not supported")
 
         if images is not None:
-            (inputs, position_ids, attention_mask, _, inputs_embeds, _) = self.prepare_inputs_labels_for_multimodal(inputs, position_ids, attention_mask, None, None, images, modalities, image_sizes=image_sizes)
+            (inputs, position_ids, attention_mask, _, inputs_embeds, _, _) = self.prepare_inputs_labels_for_multimodal(inputs, position_ids, attention_mask, None, None, images, modalities, image_sizes=image_sizes, revise_indices=None)
         else:
             inputs_embeds = self.get_model().embed_tokens(inputs)
 

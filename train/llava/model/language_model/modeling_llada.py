@@ -1644,6 +1644,8 @@ class LLaDAModelLM(LLaDAPreTrainedModel):
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
         conversation_ids: Optional[torch.LongTensor] = None,
+        revise: bool = False,
+        revise_indices: Optional[torch.Tensor] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
         r"""
         Args:
@@ -1666,26 +1668,43 @@ class LLaDAModelLM(LLaDAPreTrainedModel):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
 
-        def forward_process_embeds(input_embeds, labels, eps=1e-3):
+        def forward_process_embeds(input_embeds, labels, revise_indices, eps=1e-3):
             b, l, d = input_embeds.shape
-            t = torch.rand(b, device=input_embeds.device)
-            p_mask = (1 - eps) * t + eps
-            p_mask = p_mask[:, None].repeat(1, l)
-
-            masked_indices = torch.rand((b, l), device=input_embeds.device) < p_mask
-            # Add label condition filtering
-            valid_mask = (labels != -100) # Create valid encoding
-            masked_indices = masked_indices & valid_mask # Combine random encoding and valid encoding
-            # Magic number 126336 stands for the tokenizer special token,
-            # Magic embeddings, which is used for [MASK] token here,
+            
+            # 获取 Mask Token 的 Embedding (Magic Number 126336)
             masked_embed = self.model.embed_tokens(torch.tensor([126336]).to(input_embeds.device))
+
+            if revise and revise_indices is not None:
+                # === Revise 模式 (Inpainting) ===
+                # 1. 不进行随机 Mask，上下文必须保持清晰
+                # 2. 强制 Mask 掉 revise_indices 指定的位置
+                # p_mask 在此处设为 1.0 (完全Mask) 用于后续 Loss 计算的统一
+                p_mask = torch.ones((b, l), device=input_embeds.device) 
+                
+                # 逻辑修正：revise_indices 的位置设为 True (需要被 Mask)
+                masked_indices = revise_indices.bool() 
+                
+                # 确保 labels 为 -100 (Prompt部分) 的地方不被 Mask (虽然 revise_indices 应该已经处理好了，但加一层保险)
+                valid_mask = (labels != -100)
+                masked_indices = masked_indices & valid_mask
+
+            else:
+                # === 标准 MDM 预训练模式 ===
+                t = torch.rand(b, device=input_embeds.device)
+                p_mask = (1 - eps) * t + eps
+                p_mask = p_mask[:, None].repeat(1, l)
+
+                masked_indices = torch.rand((b, l), device=input_embeds.device) < p_mask
+                valid_mask = (labels != -100)
+                masked_indices = masked_indices & valid_mask
+            
+            # 应用 Mask：将 masked_indices 为 True 的位置替换为 [MASK] Embedding
             noisy_embeds = torch.where(masked_indices.unsqueeze(-1), masked_embed, input_embeds)
 
-            return noisy_embeds, p_mask, masked_embed
+            return noisy_embeds, p_mask, masked_indices
 
-        noisy_embeds, p_mask, masked_embed = forward_process_embeds(inputs_embeds, labels)
+        noisy_embeds, p_mask, masked_indices = forward_process_embeds(inputs_embeds, labels, revise_indices)
         
-        masked_indices = self.get_masked_indices_from_embeds(noisy_embeds, masked_embed) # shape (b, l)
         prompt_index = (labels == -100).to(torch.int64) # shape (b, l)
         
         noisy_data_length = torch.sum((1-prompt_index), dim=-1, keepdim=True) # shape (b, 1)
@@ -1729,10 +1748,38 @@ class LLaDAModelLM(LLaDAPreTrainedModel):
 
         loss = None
         if labels is not None:
-            # Change for MDM
-            token_loss = F.cross_entropy(logits[masked_indices], labels[masked_indices], ignore_index=-100,
-                                         reduction='none') / p_mask[masked_indices]
-            loss = torch.sum(token_loss / noisy_data_length[masked_indices]) / labels.shape[0]
+            if not revise:
+                token_loss = F.cross_entropy(logits[masked_indices], labels[masked_indices], ignore_index=-100,
+                                            reduction='none') / p_mask[masked_indices]
+                loss = torch.sum(token_loss / noisy_data_length[masked_indices]) / labels.shape[0]
+            else:
+                # --- Revise / Inpainting 训练 Loss ---
+                losses = []
+                for i in range(logits.shape[0]): # Batch loop
+                    # 确定当前样本需要计算 Loss 的位置
+                    # 只有 revise_indices 为 1 的位置才计算 Loss
+                    target_indices = masked_indices[i] 
+                                        
+                    if torch.sum(target_indices) > 0:
+                        # 计算 CE Loss
+                        # 注意：这里不需要除以 p_mask，因为在 Inpainting 中 p=1 (确定性 mask)
+                        # 或者为了兼容性，保留除以 p_mask (此时 p_mask 也是 1)
+                        token_loss = F.cross_entropy(
+                            logits[i][target_indices], 
+                            labels[i][target_indices], 
+                            ignore_index=-100, 
+                            reduction='none'
+                        )
+                        
+                        # 归一化：除以该样本中 Mask 的总长度，而不是整个序列长度
+                        # 这样可以避免 Mask 区域很小时 Gradient 过小
+                        revise_len = torch.sum(target_indices)
+                        revise_loss = torch.sum(token_loss) / (revise_len + 1e-8)
+                        losses.append(revise_loss)
+                    else:
+                        losses.append(torch.tensor(0.0, device=logits.device, requires_grad=True))
+                
+                loss = torch.mean(torch.stack(losses))
 
         if not return_dict:
             output = (logits,) + outputs[1:]

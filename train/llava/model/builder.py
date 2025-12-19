@@ -56,7 +56,7 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
                 "There is `lora` in model name but no `model_base` is provided. If you are loading a LoRA model, please provide the `model_base` argument. Detailed instruction: https://github.com/haotian-liu/LLaVA#launch-a-model-worker-lora-weights-unmerged."
             )
         if "lora" in model_name.lower() and model_base is not None:
-            lora_cfg_pretrained = AutoConfig.from_pretrained(model_path)
+            lora_cfg_pretrained = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
             tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
             rank0_print("Loading LLaVA from base model...")
             if "mixtral" in model_name.lower():
@@ -77,6 +77,12 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
                 lora_cfg_pretrained = LlavaGemmaConfig.from_pretrained(model_path)
                 tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
                 model = LlavaGemmaForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=lora_cfg_pretrained, attn_implementation=attn_implementation, **kwargs)
+            elif "llada" in model_name.lower():
+                from llava.model.language_model.llava_llada import LlavaLLaDAConfig
+
+                lora_cfg_pretrained = LlavaLLaDAConfig.from_pretrained(model_path, trust_remote_code=True)
+                tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+                model = LlavaLLaDAModelLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=lora_cfg_pretrained, attn_implementation=attn_implementation, trust_remote_code=True, **kwargs)
             else:
                 from llava.model.language_model.llava_llama import LlavaConfig
 
@@ -109,7 +115,7 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
             from peft import PeftModel
 
             rank0_print("Loading LoRA weights...")
-            model = PeftModel.from_pretrained(model, model_path)
+            model = PeftModel.from_pretrained(model, model_path, trust_remote_code=True)
             rank0_print("Merging LoRA weights...")
             model = model.merge_and_unload()
             rank0_print("Model is loaded...")
@@ -149,6 +155,23 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
                 tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
                 llava_cfg = LlavaConfig.from_pretrained(model_path)
                 model = LlavaLlamaForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=llava_cfg, **kwargs)
+            elif "llada" in model_name.lower():
+                from llava.model.language_model.llava_llada import LlavaLLaDAConfig
+
+                tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
+                if customized_config is None:
+                    llada_cfg = LlavaLLaDAConfig.from_pretrained(model_path, trust_remote_code=True)
+                else:
+                    llada_cfg = customized_config
+
+                if overwrite_config is not None:
+                    rank0_print(f"Overwriting config with {overwrite_config}")
+                    for k, v in overwrite_config.items():
+                        setattr(llada_cfg, k, v)
+
+                tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+                llada_cfg = LlavaLLaDAConfig.from_pretrained(model_path, trust_remote_code=True)
+                model = LlavaLLaDAModelLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=llada_cfg, trust_remote_code=True, **kwargs)
             else:
                 raise ValueError(f"Model {model_name} not supported")
 
@@ -236,7 +259,7 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
 
                 tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
                 if customized_config is None:
-                    llada_cfg = LlavaLLaDAConfig.from_pretrained(model_path)
+                    llada_cfg = LlavaLLaDAConfig.from_pretrained(model_path, trust_remote_code=True)
                 else:
                     llada_cfg = customized_config
 
@@ -245,7 +268,7 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
                     for k, v in overwrite_config.items():
                         setattr(llada_cfg, k, v)
 
-                model = LlavaLLaDAModelLM.from_pretrained(model_path, low_cpu_mem_usage=True, attn_implementation=attn_implementation, config=llada_cfg, **kwargs)
+                model = LlavaLLaDAModelLM.from_pretrained(model_path, low_cpu_mem_usage=True, attn_implementation=attn_implementation, config=llada_cfg, trust_remote_code=True, **kwargs)
 
             else:
                 try:

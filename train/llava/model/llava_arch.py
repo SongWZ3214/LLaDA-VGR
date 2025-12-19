@@ -61,26 +61,43 @@ class LlavaMetaModel:
         self.config.mm_vision_tower = vision_tower
         self.config.vision_tower_pretrained = getattr(model_args, "vision_tower_pretrained", "")
 
+        # 如果命令行参数中指定了 vision_tower，且与配置中的不同，需要重新创建
+        existing_vision_tower = self.get_vision_tower()
+        if existing_vision_tower is not None and vision_tower is not None:
+            existing_path = getattr(existing_vision_tower, 'vision_tower_name', None)
+            # 如果路径不同，删除现有的 vision_tower 并重新创建
+            if existing_path != vision_tower:
+                if fsdp is not None and len(fsdp) > 0:
+                    self.vision_tower = None
+                    self.vision_resampler = None
+                else:
+                    self.vision_tower = None
+                    self.vision_resampler = None
+
         if self.get_vision_tower() is None:
-            vision_tower = build_vision_tower(model_args)
-            vision_resampler = build_vision_resampler(model_args, vision_tower=vision_tower)
+            vision_tower_obj = build_vision_tower(model_args)
+            vision_resampler = build_vision_resampler(model_args, vision_tower=vision_tower_obj)
             for k, v in vision_resampler.config.items():
                 setattr(self.config, k, v)
 
             if fsdp is not None and len(fsdp) > 0:
-                self.vision_tower = [vision_tower]
+                self.vision_tower = [vision_tower_obj]
                 self.vision_resampler = [vision_resampler]
             else:
-                self.vision_tower = vision_tower
+                self.vision_tower = vision_tower_obj
                 self.vision_resampler = vision_resampler
         else:
             if fsdp is not None and len(fsdp) > 0:
                 vision_resampler = self.vision_resampler[0]
-                vision_tower = self.vision_tower[0]
+                vision_tower_obj = self.vision_tower[0]
             else:
                 vision_resampler = self.vision_resampler
-                vision_tower = self.vision_tower
-            vision_tower.load_model()
+                vision_tower_obj = self.vision_tower
+            # 如果路径不同，更新 vision_tower_name 并重新加载
+            if hasattr(vision_tower_obj, 'vision_tower_name') and vision_tower_obj.vision_tower_name != vision_tower:
+                vision_tower_obj.vision_tower_name = vision_tower
+                vision_tower_obj.is_loaded = False  # 标记为未加载，强制重新加载
+            vision_tower_obj.load_model()
 
             # In case it is frozen by LoRA
             for p in self.vision_resampler.parameters():
@@ -88,7 +105,7 @@ class LlavaMetaModel:
 
         self.config.use_mm_proj = True
         self.config.mm_projector_type = getattr(model_args, "mm_projector_type", "linear")
-        self.config.mm_hidden_size = getattr(vision_resampler, "hidden_size", vision_tower.hidden_size)
+        self.config.mm_hidden_size = getattr(vision_resampler, "hidden_size", vision_tower_obj.hidden_size)
         self.config.mm_vision_select_layer = mm_vision_select_layer
         self.config.mm_vision_select_feature = mm_vision_select_feature
         self.config.mm_patch_merge_type = mm_patch_merge_type
@@ -347,11 +364,12 @@ class LlavaMetaForCausalLM(ABC):
         
         return conversation_ids
 
-    def prepare_inputs_labels_for_multimodal(self, input_ids, position_ids, attention_mask, past_key_values, labels, images, modalities=["image"], image_sizes=None, is_llada=False):
+    def prepare_inputs_labels_for_multimodal(self, input_ids, position_ids, attention_mask, past_key_values, labels, images, modalities=["image"], image_sizes=None, is_llada=False, revise_indices=None):
         vision_tower = self.get_vision_tower()
         # rank_print(modalities)
         if vision_tower is None or images is None or input_ids.shape[1] == 1:
-            return input_ids, position_ids, attention_mask, past_key_values, None, labels
+            # 如果没有图像处理，revise_indices 保持不变
+            return input_ids, position_ids, attention_mask, past_key_values, None, labels, revise_indices
 
         if isinstance(modalities, str):
             modalities = [modalities]
@@ -540,20 +558,34 @@ class LlavaMetaForCausalLM(ABC):
         _input_ids = input_ids
         input_ids = [cur_input_ids[cur_attention_mask] for cur_input_ids, cur_attention_mask in zip(input_ids, attention_mask)]
         labels = [cur_labels[cur_attention_mask] for cur_labels, cur_attention_mask in zip(labels, attention_mask)]
+        
+        # 同步处理 revise_indices：移除 padding
+        if revise_indices is not None:
+            revise_indices = [cur_revise_indices[cur_attention_mask] for cur_revise_indices, cur_attention_mask in zip(revise_indices, attention_mask)]
+        else:
+            revise_indices = [None] * len(input_ids)
 
         new_input_embeds = []
         new_labels = []
+        new_revise_indices = []
         cur_image_idx = 0
         # rank_print("Inserting Images embedding")
         for batch_idx, cur_input_ids in enumerate(input_ids):
             num_images = (cur_input_ids == IMAGE_TOKEN_INDEX).sum()
             # rank0_print(num_images)
+            cur_revise_indices = revise_indices[batch_idx]
+            
             if num_images == 0:
                 cur_image_features = image_features[cur_image_idx]
                 cur_input_embeds_1 = self.get_model().embed_tokens(cur_input_ids)
                 cur_input_embeds = torch.cat([cur_input_embeds_1, cur_image_features[0:0]], dim=0)
                 new_input_embeds.append(cur_input_embeds)
                 new_labels.append(labels[batch_idx])
+                # revise_indices 保持不变（没有图像插入）
+                if cur_revise_indices is not None:
+                    new_revise_indices.append(cur_revise_indices)
+                else:
+                    new_revise_indices.append(None)
                 cur_image_idx += 1
                 continue
 
@@ -561,18 +593,24 @@ class LlavaMetaForCausalLM(ABC):
             cur_input_ids_noim = []
             cur_labels = labels[batch_idx]
             cur_labels_noim = []
+            cur_revise_noim = []
             for i in range(len(image_token_indices) - 1):
                 cur_input_ids_noim.append(cur_input_ids[image_token_indices[i] + 1 : image_token_indices[i + 1]])
                 cur_labels_noim.append(cur_labels[image_token_indices[i] + 1 : image_token_indices[i + 1]])
+                if cur_revise_indices is not None:
+                    cur_revise_noim.append(cur_revise_indices[image_token_indices[i] + 1 : image_token_indices[i + 1]])
             split_sizes = [x.shape[0] for x in cur_labels_noim]
             cur_input_embeds = self.get_model().embed_tokens(torch.cat(cur_input_ids_noim))
             cur_input_embeds_no_im = torch.split(cur_input_embeds, split_sizes, dim=0)
             cur_new_input_embeds = []
             cur_new_labels = []
+            cur_new_revise_indices = []
 
             for i in range(num_images + 1):
                 cur_new_input_embeds.append(cur_input_embeds_no_im[i])
                 cur_new_labels.append(cur_labels_noim[i])
+                if cur_revise_indices is not None:
+                    cur_new_revise_indices.append(cur_revise_noim[i])
                 if i < num_images:
                     try:
                         cur_image_features = image_features[cur_image_idx]
@@ -581,15 +619,23 @@ class LlavaMetaForCausalLM(ABC):
                     cur_image_idx += 1
                     cur_new_input_embeds.append(cur_image_features)
                     cur_new_labels.append(torch.full((cur_image_features.shape[0],), IGNORE_INDEX, device=cur_labels.device, dtype=cur_labels.dtype))
+                    # 图像特征部分不参与 revise loss，插入 False
+                    if cur_revise_indices is not None:
+                        cur_new_revise_indices.append(torch.zeros((cur_image_features.shape[0],), dtype=torch.bool, device=cur_revise_indices.device))
 
             cur_new_input_embeds = [x.to(self.device) for x in cur_new_input_embeds]
 
             # import pdb; pdb.set_trace()
             cur_new_input_embeds = torch.cat(cur_new_input_embeds)
             cur_new_labels = torch.cat(cur_new_labels)
+            if cur_revise_indices is not None:
+                cur_new_revise_indices = torch.cat(cur_new_revise_indices)
+            else:
+                cur_new_revise_indices = None
 
             new_input_embeds.append(cur_new_input_embeds)
             new_labels.append(cur_new_labels)
+            new_revise_indices.append(cur_new_revise_indices)
 
         # Truncate sequences to max length as image embeddings can make the sequence longer
         tokenizer_model_max_length = getattr(self.config, "tokenizer_model_max_length", None)
@@ -597,6 +643,8 @@ class LlavaMetaForCausalLM(ABC):
 
         new_input_embeds = [x[:tokenizer_model_max_length] for x, modality in zip(new_input_embeds, modalities)]
         new_labels = [x[:tokenizer_model_max_length] for x, modality in zip(new_labels, modalities)]
+        # 同步截断 revise_indices
+        new_revise_indices = [x[:tokenizer_model_max_length] if x is not None else None for x, modality in zip(new_revise_indices, modalities)]
         # TODO: Hard code for control loss spike
         # if tokenizer_model_max_length is not None:
         #     new_input_embeds = [x[:4096] if modality != "video" else x[:tokenizer_model_max_length] for x, modality in zip(new_input_embeds, modalities)]
@@ -610,22 +658,33 @@ class LlavaMetaForCausalLM(ABC):
         new_labels_padded = torch.full((batch_size, max_len), IGNORE_INDEX, dtype=new_labels[0].dtype, device=new_labels[0].device)
         attention_mask = torch.zeros((batch_size, max_len), dtype=attention_mask.dtype, device=attention_mask.device)
         position_ids = torch.zeros((batch_size, max_len), dtype=position_ids.dtype, device=position_ids.device)
+        # 初始化 revise_indices_padded（如果存在）
+        has_revise_indices = any(x is not None for x in new_revise_indices)
+        if has_revise_indices:
+            revise_indices_padded = torch.zeros((batch_size, max_len), dtype=torch.bool, device=new_labels[0].device)
+        else:
+            revise_indices_padded = None
         # rank0_print("Prepare pos id")
 
         for i, (cur_new_embed, cur_new_labels) in enumerate(zip(new_input_embeds, new_labels)):
             cur_len = cur_new_embed.shape[0]
+            cur_revise_indices = new_revise_indices[i]
             if getattr(self.config, "tokenizer_padding_side", "right") == "left":
                 new_input_embeds_padded.append(torch.cat((torch.zeros((max_len - cur_len, cur_new_embed.shape[1]), dtype=cur_new_embed.dtype, device=cur_new_embed.device), cur_new_embed), dim=0))
                 if cur_len > 0:
                     new_labels_padded[i, -cur_len:] = cur_new_labels
                     attention_mask[i, -cur_len:] = True
                     position_ids[i, -cur_len:] = torch.arange(0, cur_len, dtype=position_ids.dtype, device=position_ids.device)
+                    if cur_revise_indices is not None and revise_indices_padded is not None:
+                        revise_indices_padded[i, -cur_len:] = cur_revise_indices
             else:
                 new_input_embeds_padded.append(torch.cat((cur_new_embed, torch.zeros((max_len - cur_len, cur_new_embed.shape[1]), dtype=cur_new_embed.dtype, device=cur_new_embed.device)), dim=0))
                 if cur_len > 0:
                     new_labels_padded[i, :cur_len] = cur_new_labels
                     attention_mask[i, :cur_len] = True
                     position_ids[i, :cur_len] = torch.arange(0, cur_len, dtype=position_ids.dtype, device=position_ids.device)
+                    if cur_revise_indices is not None and revise_indices_padded is not None:
+                        revise_indices_padded[i, :cur_len] = cur_revise_indices
 
         new_input_embeds = torch.stack(new_input_embeds_padded, dim=0)
         # rank0_print("tokenizer padding")
@@ -653,10 +712,10 @@ class LlavaMetaForCausalLM(ABC):
         # add conversation_ids 
         if is_llada and attention_mask is not None: 
             conversation_ids = self.generate_conversation_ids(new_labels)
-            return None, position_ids, attention_mask, past_key_values, new_input_embeds, new_labels, conversation_ids
+            return None, position_ids, attention_mask, past_key_values, new_input_embeds, new_labels, conversation_ids, revise_indices_padded
         # import pdb; pdb.set_trace()
         # rank0_print("Finish preparing")
-        return None, position_ids, attention_mask, past_key_values, new_input_embeds, new_labels
+        return None, position_ids, attention_mask, past_key_values, new_input_embeds, new_labels, revise_indices_padded
 
     def initialize_vision_tokenizer(self, model_args, tokenizer):
         if model_args.mm_use_im_patch_token:

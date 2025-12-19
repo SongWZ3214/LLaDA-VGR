@@ -9,6 +9,7 @@ import time
 import warnings
 import spacy
 import re
+import logging
 from typing import List, Dict, Tuple, Any, Optional
 from dataclasses import asdict
 from PIL import Image
@@ -16,7 +17,7 @@ from PIL import Image
 # 将当前运行目录添加到系统路径，确保能找到 groundingdino 文件夹
 sys.path.append(os.getcwd())
 # 硬编码你的路径
-sys.path.append("/data2/tyc/GroundingDINO")
+sys.path.append("/data0/swz/GroundingDINO")
 
 # === Grounding DINO Imports ===
 try:
@@ -30,8 +31,8 @@ except ImportError:
 # === 全局配置 ===
 class Config:
     # Grounding DINO Setup
-    dino_config_path = "groundingdino/config/GroundingDINO_SwinT_OGC.py"
-    dino_weights_path = "weights/groundingdino_swint_ogc.pth"
+    dino_config_path = "/data0/swz/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
+    dino_weights_path = "/data0/swz/GroundingDINO/weights/groundingdino_swint_ogc.pth"
     box_threshold = 0.35
     text_threshold = 0.25
     SPAN_K = 5
@@ -73,82 +74,82 @@ class TextMiner:
         return cls._nlp
 
     @classmethod
-    def clean_text(cls, text: str) -> str:
-        """清洗文本：去除 Tokenizer 产生的类似 'elephant1' 这种数字后缀"""
-        # 移除单词末尾的数字 (e.g., "elephant1" -> "elephant")
-        text = re.sub(r'(?<=[a-zA-Z])\d+', '', text)
-        # 移除多余空格
-        text = re.sub(r'\s+', ' ', text).strip()
-        return text
-
-    @classmethod
-    def process_span(cls, text_span: str, use_raw: bool = False) -> str:
+    def analyze_token_for_refinement(cls, doc, char_offset: int) -> Tuple[Optional[str], Optional[Tuple[int, int]]]:
         """
-        统一入口：根据配置决定是返回 Raw Span 还是提取 Core Phrase
+        策略 V5 (最终修复版): 
+        1. 对齐修正: 自动跳过 LLaMA Token 前面的空格，对齐到 Spacy Token 的单词首字母。
+        2. 锚点寻找 & 并集覆盖 (保持 V4 逻辑)。
         """
-        clean = cls.clean_text(text_span)
-        if use_raw:
-            return clean
-        return cls.extract_core_phrase(clean)
+        
+        # 边界检查
+        if char_offset >= len(doc.text):
+            return None, None
+            
+        # 只要当前字符是空格，就往后挪
+        while char_offset < len(doc.text) and doc.text[char_offset].isspace():
+            char_offset += 1
 
-    @classmethod
-    def extract_core_phrase(cls, text_span: str) -> str:
-        """
-        智能核心词提取：利用 Noun Chunks (名词块) 保持形容词+名词的完整性
-        """
-        # 1. 预清洗文本
-        clean_span = cls.clean_text(text_span)
-        nlp = cls.get_nlp()
-        doc = nlp(clean_span)
+        # === 接下来是正常的 Token 查找 ===
+        target_token = None
+        for token in doc:
+            # 宽松匹配：只要 offset 落在 token 范围内即可
+            if token.idx <= char_offset < (token.idx + len(token.text)):
+                target_token = token
+                break
+        
+        # 如果修正后还是找不到 (比如选中的是纯空格)，则退出
+        if not target_token:
+            # print(f"    [Debug] No Spacy token found at aligned offset {char_offset}")
+            return None, None
 
-        candidates = []
+        # 辅助函数: 判断 token 是否在某个 chunk 里
+        def get_chunk_containing(t):
+            for chunk in doc.noun_chunks:
+                if chunk.start <= t.i < chunk.end:
+                    return chunk
+            return None
 
-        # 2. 使用 noun_chunks (Spacy 会自动提取 "the black cat" 作为一个块)
-        # 如果 span 很短没有 chunk，退化为 token 分析
-        chunks = list(doc.noun_chunks)
-
-        if not chunks:
-            # 兜底：如果没有名词块，找最长的名词或实词
-            for token in doc:
-                if token.pos_ in ["NOUN", "PROPN"] and token.text.lower() not in cls.STOP_WORDS:
-                    return token.text
-            return max([t.text for t in doc if not t.is_stop], key=len) if len(doc) > 0 else "object"
-
-        # 3. 筛选最佳的名词块
-        for chunk in chunks:
-            # 去除冠词/限定词 (e.g., "the black cat" -> "black cat")
-            root_text = chunk.root.text.lower()  # 核心名词
-            full_text = chunk.text
-
-            # 这里的逻辑是：去掉开头的冠词
-            words = full_text.split()
-            if words[0].lower() in ["a", "an", "the", "this", "that"]:
-                refined_phrase = " ".join(words[1:])
+        # --- 第一阶段: 寻找锚点 (Anchor) ---
+        anchor_chunk = None
+        direct_chunk = get_chunk_containing(target_token)
+        if direct_chunk:
+            anchor_chunk = direct_chunk
+        else:
+            anchor_token = None
+            if target_token.pos_ == "VERB":
+                for child in target_token.children:
+                    if child.dep_ in {"dobj", "attr", "nsubjpass", "nsubj", "pobj"} and child.pos_ in {"NOUN", "PROPN"}:
+                        anchor_token = child
+                        break
+            elif target_token.pos_ == "ADP":
+                for child in target_token.children:
+                    if child.dep_ == "pobj" and child.pos_ in {"NOUN", "PROPN"}:
+                        anchor_token = child
+                        break
             else:
-                refined_phrase = full_text
+                if target_token.head.pos_ in {"NOUN", "PROPN"}:
+                    anchor_token = target_token.head
+                elif target_token.head.pos_ == "ADJ" and target_token.head.head.pos_ in {"NOUN", "PROPN"}:
+                    anchor_token = target_token.head.head
 
-            # 如果剩下来的词是空的，或者是纯抽象词，跳过
-            if not refined_phrase or refined_phrase.lower() in cls.STOP_WORDS:
-                continue
+            if anchor_token:
+                anchor_chunk = get_chunk_containing(anchor_token)
+                if not anchor_chunk:
+                    anchor_chunk = doc[anchor_token.i : anchor_token.i + 1]
 
-            # 如果核心名词是抽象词 (比如 "piece of cake" 中的 piece)，尝试降低优先级或跳过
-            # 这里简单处理：如果核心词在黑名单，就跳过这个chunk
-            if root_text in cls.STOP_WORDS:
-                continue
+        if not anchor_chunk:
+            return None, None
 
-            # 评分：长度越长包含信息越多 (优先 "black cat" 而不是 "cat")
-            # 且包含名词
-            score = len(refined_phrase)
-            candidates.append((refined_phrase, score))
-
-        if candidates:
-            # 按长度降序排列，取最长的有效名词短语
-            candidates.sort(key=lambda x: x[1], reverse=True)
-            return candidates[0][0]
-
-        # 再次兜底
-        return "object"
-
+        # --- 第二阶段: 计算并集范围 (Mask Range) ---
+        dino_phrase = anchor_chunk.text
+        t_start = target_token.idx
+        t_end = target_token.idx + len(target_token.text)
+        a_start = anchor_chunk.start_char
+        a_end = anchor_chunk.end_char
+        union_start = min(t_start, a_start)
+        union_end = max(t_end, a_end)
+        
+        return dino_phrase, (union_start, union_end)
 
 # === 波动分析器 (Jitter Analyzer) ===
 class JitterAnalyzer:
@@ -212,29 +213,39 @@ class JitterAnalyzer:
 
 # ====== 视觉定位模块 (GroundingAgent) =======
 class GroundingAgent:
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, logger: Optional[logging.Logger] = None):
         self.cfg = config
         self.model = None
+        # 设置日志
+        if logger is None:
+            self.logger = logging.getLogger(__name__)
+            self.logger.setLevel(logging.INFO)
+            if not self.logger.handlers:
+                handler = logging.StreamHandler()
+                handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+                self.logger.addHandler(handler)
+        else:
+            self.logger = logger
 
     def load(self):
         if not DINO_AVAILABLE: return
-        print(f">>> Loading Grounding DINO from {self.cfg.dino_weights_path}...")
+        self.logger.info(f">>> Loading Grounding DINO from {self.cfg.dino_weights_path}...")
         self.model = load_model(self.cfg.dino_config_path, self.cfg.dino_weights_path)
 
     # 增加 image_path 参数
     def run_grounding(self, core_phrase: str, specific_output_dir: str, image_path: str):
         if not self.model:
-            print("Grounding DINO model not loaded.")
-            return
+            self.logger.warning("Grounding DINO model not loaded.")
+            return None, None
 
-        print(f"\n>>> Running Grounding DINO for prompt: '{core_phrase}'")
+        self.logger.info(f"\n>>> Running Grounding DINO for prompt: '{core_phrase}'")
 
         # 1. 加载图像 (使用传入的 image_path，而不是 self.cfg.image_path)
         try:
             image_source, image = load_image(image_path)
         except Exception as e:
-            print(f"Error loading image: {e}")
-            return
+            self.logger.error(f"Error loading image: {e}")
+            return None, None
 
         h_img, w_img, _ = image_source.shape
 
@@ -248,13 +259,16 @@ class GroundingAgent:
         )
 
         if len(boxes) == 0:
-            print(f"No objects found for '{core_phrase}'.")
-            return
+            self.logger.info(f"No objects found for '{core_phrase}'.")
+            return None, None
 
         # 选最佳框
         best_idx = torch.argmax(logits).item()
         best_box = boxes[best_idx]  # (cx, cy, w, h) 归一化坐标
         best_logit = logits[best_idx].item()
+        
+        if best_logit < 0.50:
+            return None, best_logit
 
         # --- 动态外扩逻辑 ---
         cx, cy, w_box, h_box = best_box.tolist()
@@ -294,7 +308,7 @@ class GroundingAgent:
             try:
                 crop_img = cv2.cvtColor(crop_img, cv2.COLOR_RGB2BGR)
             except Exception as e:
-                print(f"Color conversion failed: {e}")
+                self.logger.warning(f"Color conversion failed: {e}")
 
             # 清洗文件名
             safe_phrase = core_phrase.replace(" ", "_")
@@ -305,38 +319,11 @@ class GroundingAgent:
             save_path = os.path.join(specific_output_dir, filename)
 
             cv2.imwrite(save_path, crop_img)
-            print(f"Best Crop Saved: {save_path} (Conf: {best_logit:.2f})")
+            self.logger.info(f"Best Crop Saved: {save_path} (Conf: {best_logit:.2f})")
+            return save_path, best_logit
         else:
-            print("Crop failed: Invalid coordinates.")
-
-
-def manual_annotate(image_source, boxes, logits, phrases):
-    """
-    手动使用 OpenCV 画框和标签，替代 broken 的 supervise 库函数
-    """
-    h, w, _ = image_source.shape
-    # 转换坐标: (cx, cy, w, h) -> (x1, y1, x2, y2)
-    boxes_xyxy = box_cxcywh_to_xyxy(boxes) * torch.Tensor([w, h, w, h])
-
-    annotated_frame = image_source.copy()
-
-    for box, conf, label in zip(boxes_xyxy, logits, phrases):
-        x1, y1, x2, y2 = box.int().tolist()
-
-        # 1. 画矩形框 (绿色, 线宽2)
-        cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-
-        # 2. 准备标签文本
-        text = f"{label} {conf:.2f}"
-
-        # 3. 画文字背景 (为了看清楚字)
-        (text_w, text_h), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
-        cv2.rectangle(annotated_frame, (x1, y1 - text_h - 6), (x1 + text_w, y1), (0, 255, 0), -1)
-
-        # 4. 画文字 (白色)
-        cv2.putText(annotated_frame, text, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-
-    return annotated_frame
+            self.logger.warning("Crop failed: Invalid coordinates.")
+            return None, 0.0
 
 # === Mask工具函数 ===
 def mask_high_jitter_tokens(token_ids_list, span_range, tokenizer, mask_token_id=126336):

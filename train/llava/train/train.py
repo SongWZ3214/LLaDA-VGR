@@ -164,6 +164,8 @@ class TrainingArguments(transformers.TrainingArguments):
     lora_dropout: float = 0.05
     lora_weight_path: str = ""
     lora_bias: str = "none"
+    lora_target_modules: Optional[str] = field(default=None, metadata={"help": "Comma-separated list of module names to apply LoRA to. If None, will auto-detect all linear layers."})
+    modules_to_save: Optional[str] = field(default=None, metadata={"help": "Comma-separated list of module names to fully fine-tune (not using LoRA)."})
     mm_projector_lr: Optional[float] = None
     mm_vision_tower_lr: Optional[float] = None
     group_by_varlen: bool = field(default=False)
@@ -174,6 +176,7 @@ class TrainingArguments(transformers.TrainingArguments):
     verbose_logging: bool = field(default=False)
     attn_implementation: str = field(default="flash_attention_2", metadata={"help": "Use transformers attention implementation."})
     use_conversation_mask: bool=field(default=True)
+    revise: bool=field(default=False, metadata={"help": "Whether to enable the revise training."})
 
 
 # @dataclass
@@ -1402,6 +1405,12 @@ class LazySupervisedDataset(Dataset):
 
     def _get_item(self, i) -> Dict[str, torch.Tensor]:
         sources = self.list_data_dict[i]
+        # 检查是否有 revise 字段
+        if 'revise' in sources:
+            revise_flag = 1
+            revises = sources['revise']
+        else:
+            revise_flag = 0
         if isinstance(i, int):
             sources = [sources]
         assert len(sources) == 1, "Don't know why it is wrapped to a list"  # FIXME
@@ -1511,6 +1520,136 @@ class LazySupervisedDataset(Dataset):
             data_dict["is_plain"] = False
             data_dict["is_llada"] = True
 
+        # 处理 revise 字段（如果存在）
+        if revise_flag:
+            # 转换为 list 处理，方便切片和拼接，处理完再转回 tensor
+            input_ids_list = data_dict["input_ids"].tolist()
+            labels_list = data_dict["labels"].tolist()
+            
+            # 我们需要构建新的序列，因为长度可能会变
+            new_input_ids = []
+            new_labels = []
+            
+            # 记录当前处理到的原始序列索引
+            current_idx = 0
+            
+            # 用于标记 revise 区域的 mask (用于 Loss 计算)
+            # 由于长度变化，我们需要在构建新序列的过程中动态生成这个 mask
+            revise_mask_list = [] 
+            
+            # Mask Token ID
+            mask_token_id = 126336
+            space_token_id = 220
+            
+            # 假设 revises 里的 org 是按顺序在文本中出现的
+            # 如果不是有序的，需要先对 revises 按在原文中的位置排序 (但这很难，通常假设有序)
+            
+            for revise in revises:
+                target = revise['target']
+                
+                # 1. 编码 target
+                # 使用 safe encoding 技巧，确保处理好前导空格
+                target_ids = self.tokenizer.encode('dummy ' + target, add_special_tokens=False)[1:] # [dummy, space_target...] -> [space_target...]
+                target_len = len(target_ids)
+                
+                if target_len == 0: continue
+
+                # 2. 在 input_ids_list 中寻找“Mask 区间” (从 current_idx 开始找)
+                # 目标是找到连续的一串 mask (中间夹杂空格)，这是我们要替换的“旧坑”
+                mask_start = -1
+                mask_end = -1
+                
+                # 寻找起点
+                for i in range(current_idx, len(input_ids_list)):
+                    if input_ids_list[i] == mask_token_id:
+                        mask_start = i
+                        break
+                
+                if mask_start == -1:
+                    # 没找到 mask，说明数据有问题，跳出
+                    break
+                    
+                # 寻找终点 (贪婪匹配，把连续的 mask 和空格都吃掉)
+                # 这里的逻辑是：只要是 mask 或 space，就认为是这个坑的一部分
+                j = mask_start
+                while j < len(input_ids_list):
+                    token = input_ids_list[j]
+                    if token == mask_token_id or token == space_token_id:
+                        j += 1
+                    else:
+                        break
+                mask_end = j # 开区间，不包含 j
+                
+                # 3. 拼接非 revise 部分 (Context)
+                # 将上一段结束到这一段 mask 开始的内容加进来
+                context_segment = input_ids_list[current_idx : mask_start]
+                new_input_ids.extend(context_segment)
+                
+                # labels 对应的 context 部分保持原样 (通常是 -100 或原 token)
+                # 但要注意：因为我们最后要统一设 -100，这里先复制过来
+                new_labels.extend(labels_list[current_idx : mask_start])
+                
+                # revise_mask 对应的 context 部分是 False
+                revise_mask_list.extend([False] * len(context_segment))
+                
+                # 4. 拼接 revise 部分 (Target)
+                # 无论原来坑有多大 (mask_end - mask_start)，我们都只填入 target_len 长度的内容
+                
+                # Input: 填入 target_len 个 [MASK] token
+                new_input_ids.extend([mask_token_id] * target_len)
+                
+                # Labels: 填入 target IDs
+                new_labels.extend(target_ids)
+                
+                # Revise Mask: 填入 True
+                revise_mask_list.extend([True] * target_len)
+                
+                # 更新指针
+                current_idx = mask_end
+                
+            # 5. 拼接剩余的尾部
+            if current_idx < len(input_ids_list):
+                tail_segment = input_ids_list[current_idx:]
+                new_input_ids.extend(tail_segment)
+                new_labels.extend(labels_list[current_idx:])
+                revise_mask_list.extend([False] * len(tail_segment))
+                        
+            # 6. 处理 Padding / Truncation (因为长度变了)
+            max_len = self.tokenizer.model_max_length # 或者 args.model_max_length
+            
+            if len(new_input_ids) > max_len:
+                # 截断
+                new_input_ids = new_input_ids[:max_len]
+                new_labels = new_labels[:max_len]
+                revise_mask_list = revise_mask_list[:max_len]
+            else:
+                # Padding (假设 pad_token_id 是 tokenizer.pad_token_id)
+                pad_len = max_len - len(new_input_ids)
+                pad_id = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else 0
+                
+                new_input_ids.extend([pad_id] * pad_len)
+                new_labels.extend([-100] * pad_len) # Label padding 也是 -100
+                revise_mask_list.extend([False] * pad_len)
+            
+            # 7. 转回 Tensor 并更新 data_dict
+            data_dict["input_ids"] = torch.tensor(new_input_ids, dtype=torch.long)
+            data_dict["labels"] = torch.tensor(new_labels, dtype=torch.long)
+            revise_indices = torch.tensor(revise_mask_list, dtype=torch.bool)
+            data_dict['revise_indices'] = revise_indices
+                        
+            # 8. 最后处理 Loss Masking (非 revise 部分设为 -100)
+            # 保留 Prompt 部分 (-100) 的逻辑依然适用，但因为我们在上面拼接 labels 时已经复制了原 label，
+            # 如果原 label 是 -100 (prompt)，它还是 -100。
+            # 我们只需要把那些 "非 prompt 且 非 revise" 的 label 设为 -100。
+            
+            # 注意：这里的 data_dict['labels'] 已经是包含了 target_ids 的新 label
+            # 我们只需要把 revise_indices 为 False 的位置强制设为 -100
+            # 但要小心，不要覆盖掉原本就是 -100 的 prompt (虽然结果都是 -100，逻辑上没区别)
+            
+            # 简单粗暴做法：只要不是 revise 的地方，全设为 -100
+            non_revise_mask = ~revise_indices
+            data_dict['labels'][non_revise_mask] = -100
+                    
         return data_dict
 
 
@@ -1547,6 +1686,13 @@ class DataCollatorForSupervisedDataset(object):
                 input_ids=input_ids,
                 labels=labels.long() if labels.dtype == torch.int32 else labels,
             )
+            
+            # 处理 revise_indices（如果存在）
+            if 'revise_indices' in instances[0]:
+                revise_indices = tuple([instance['revise_indices'] for instance in instances])
+                revise_indices = [_revise_indices[: self.tokenizer.model_max_length] for _revise_indices in revise_indices]
+                revise_indices = self.pad_sequence(revise_indices, batch_first=True, padding_value=False)
+                batch['revise_indices'] = revise_indices
             
             # Only add attention_mask for multi-round dialogs with conversation_mask enabled
             if "is_plain" in instances[0] and not instances[0]["is_plain"] and self.training_args.use_conversation_mask:
@@ -1740,7 +1886,14 @@ def get_model(model_args, training_args, bnb_model_from_pretrained_args):
                 low_cpu_mem_usage=False,
                 **customized_kwargs,
             )
-        elif "llada" in model_args.model_name_or_path.lower():
+        elif "llada" in model_args.model_name_or_path.lower() or "rediff" in model_args.model_name_or_path.lower():
+            # 如果指定了 vision_tower，在加载模型前覆盖配置中的路径
+            if model_args.vision_tower is not None and cfg_pretrained is None:
+                cfg_pretrained = AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
+            if model_args.vision_tower is not None and cfg_pretrained is not None:
+                cfg_pretrained.mm_vision_tower = model_args.vision_tower
+                customized_kwargs["config"] = cfg_pretrained
+            
             model = LlavaLLaDAModelLM.from_pretrained(
                 model_args.model_name_or_path,
                 cache_dir=training_args.cache_dir,
@@ -1830,13 +1983,27 @@ def train(attn_implementation=None):
     if training_args.lora_enable:
         from peft import LoraConfig, get_peft_model
 
+        # 确定 target_modules：如果指定了 lora_target_modules，使用它；否则自动查找
+        if training_args.lora_target_modules:
+            # 解析逗号分隔的模块名称列表
+            target_modules = [m.strip() for m in training_args.lora_target_modules.split(",")]
+        else:
+            # 自动查找所有线性层
+            target_modules = find_all_linear_names(model)
+        
+        # 解析 modules_to_save（如果指定）
+        modules_to_save = None
+        if training_args.modules_to_save:
+            modules_to_save = [m.strip() for m in training_args.modules_to_save.split(",")]
+        
         lora_config = LoraConfig(
             r=training_args.lora_r,
             lora_alpha=training_args.lora_alpha,
-            target_modules=find_all_linear_names(model),
+            target_modules=target_modules,
             lora_dropout=training_args.lora_dropout,
             bias=training_args.lora_bias,
             task_type="CAUSAL_LM",
+            modules_to_save=modules_to_save,  # 添加 modules_to_save 参数
         )
         if training_args.bits == 16:
             if training_args.bf16:
@@ -1855,6 +2022,7 @@ def train(attn_implementation=None):
         or "vicuna" in model_args.model_name_or_path.lower()
         or "llama" in model_args.model_name_or_path.lower()
         or "llada" in model_args.model_name_or_path.lower()
+        or "rediff" in model_args.model_name_or_path.lower()
         or "yi" in model_args.model_name_or_path.lower()
         or "nous-hermes" in model_args.model_name_or_path.lower()
         and "wizard-2" in model_args.model_name_or_path.lower()
@@ -2010,6 +2178,11 @@ def train(attn_implementation=None):
                     if training_args.bf16 and module.weight.dtype == torch.float32:
                         module = module.to(torch.bfloat16)
 
+    # 设置 revise 模式
+    if hasattr(training_args, 'revise') and training_args.revise:
+        model.decide_revise(True)
+        rank0_print("Revise training mode enabled")
+    
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args, training_args=training_args)
     setattr(training_args, "use_webdataset", getattr(data_args, "use_webdataset"))
     trainer = LLaVATrainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)

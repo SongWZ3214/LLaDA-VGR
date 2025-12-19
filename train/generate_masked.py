@@ -21,7 +21,7 @@ import sys
 import os
 
 # 添加可视化脚本的路径到sys.path
-sys.path.insert(0, '/data2/swz/LLaDA-VGR/test/scripts')
+sys.path.insert(0, '/data0/swz/LLaDA-VGR/test/scripts')
 from visualize_confidence_trends import (
     process_single_sample,
 )
@@ -36,11 +36,15 @@ use_dllm_cache = False  # using dLLM-Cache(https://github.com/maomaocun/dLLM-cac
 
 warnings.filterwarnings("ignore")
 # pretrained = "GSAI-ML/LLaDA-V"
-pretrained = "jiyatai/ReDiff"
+# 训练好的 LoRA 模型路径（使用绝对路径）
+pretrained = "/data0/swz/LLaDA-VGR/train/exp/llada_vgr_lora_rank64"
+# 基础模型路径（用于加载 tokenizer 和基础权重）
+model_base = "jiyatai/ReDiff"
 
-model_name = "llava_llada"
-device = "cuda:1"
-device_map = "cuda:1"
+# 注意：model_name 需要包含 "lora" 关键字才能正确加载 LoRA 模型
+model_name = "llava_llada_lora"
+device = "cuda:0"
+device_map = "cuda:0"
 
 # 设置 vision_tower 路径（覆盖配置文件中的路径）
 # 如果本地路径不存在，可以尝试使用 HuggingFace Hub 上的模型
@@ -52,13 +56,13 @@ vision_tower_path = "google/siglip2-so400m-patch14-384"
 # vision_tower_path = "model/siglip2-so400m-patch14-384"
 
 # 设置默认CUDA设备
-torch.cuda.set_device(1)
+torch.cuda.set_device(0)
 
 # 加载模型：先不使用 device_map，加载后再手动移动到设备
 # 这样可以避免 device_map 可能导致的设备不一致问题
 # 使用 overwrite_config 覆盖 vision_tower 路径
 tokenizer, model, image_processor, max_length = load_pretrained_model(
-    pretrained, None, model_name, 
+    pretrained, model_base, model_name, 
     attn_implementation="sdpa", 
     device_map=None,  # 先不使用 device_map
     overwrite_config={"mm_vision_tower": vision_tower_path}  # 覆盖 vision_tower 路径
