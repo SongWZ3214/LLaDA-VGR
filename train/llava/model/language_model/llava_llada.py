@@ -91,6 +91,8 @@ class LlavaLLaDAModelLM(LLaDAModelLM, LlavaMetaForCausalLM):
         dpo_forward: Optional[bool] = None,
         cache_position=None,
         revise_indices: Optional[torch.Tensor] = None,
+        sample_types: Optional[torch.LongTensor] = None,
+        bboxes: Optional[torch.FloatTensor] = None,
         **kwargs,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
@@ -136,6 +138,8 @@ class LlavaLLaDAModelLM(LLaDAModelLM, LlavaMetaForCausalLM):
                 conversation_ids=conversation_ids,
                 revise=revise,
                 revise_indices=revise_indices,  # 从函数参数中获取
+                sample_types=sample_types,
+                bboxes=bboxes,
             )
 
     @torch.no_grad()

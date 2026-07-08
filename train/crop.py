@@ -14,38 +14,35 @@ from typing import List, Dict, Tuple, Any, Optional
 from dataclasses import asdict
 from PIL import Image
 
-# 将当前运行目录添加到系统路径，确保能找到 groundingdino 文件夹
+REPO_ROOT = Path(__file__).resolve().parents[1]
+WORKSPACE_ROOT = REPO_ROOT.parent
 sys.path.append(os.getcwd())
-# 硬编码你的路径
-sys.path.append("/data0/swz/GroundingDINO")
+sys.path.append(str(WORKSPACE_ROOT / "GroundingDINO"))
 
 # === Grounding DINO Imports ===
 try:
     from groundingdino.util.inference import load_model, load_image, predict
     from groundingdino.util.box_ops import box_cxcywh_to_xyxy
+
     DINO_AVAILABLE = True
 except ImportError:
     print("Warning: GroundingDINO not installed. Visual grounding will be skipped.")
     DINO_AVAILABLE = False
 
-# === 全局配置 ===
+
 class Config:
     # Grounding DINO Setup
-    dino_config_path = "/data0/swz/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
-    dino_weights_path = "/data0/swz/GroundingDINO/weights/groundingdino_swint_ogc.pth"
+    dino_config_path = str(WORKSPACE_ROOT / "GroundingDINO" / "groundingdino" / "config" / "GroundingDINO_SwinT_OGC.py")
+    dino_weights_path = str(WORKSPACE_ROOT / "GroundingDINO" / "weights" / "groundingdino_swint_ogc.pth")
     box_threshold = 0.35
     text_threshold = 0.25
     SPAN_K = 5
 
-    # 是否直接使用原始 Token Span，不进行 Spacy 核心词提取
-    # True: "a small red cat" -> "a small red cat"
-    # False: "a small red cat" -> "cat"
     USE_RAW_SPAN = True
 
-    # 裁剪框外扩参数
-    # 当检测框面积小于全图面积的 MIN_CROP_RATIO 时，或者为了获取更多语义，强制将框向外扩大 EXPANSION_RATIO (例如 1.5 倍)
     MIN_CROP_RATIO = 0.05  # 如果框小于图的 5%，扩
     EXPANSION_FACTOR = 1.5  # 扩大倍数，1.0 为原大小，1.5 为扩大 50%
+
 
 # === 核心语义提取器 (Spacy 优化版) ===
 class TextMiner:
@@ -80,11 +77,11 @@ class TextMiner:
         1. 对齐修正: 自动跳过 LLaMA Token 前面的空格，对齐到 Spacy Token 的单词首字母。
         2. 锚点寻找 & 并集覆盖 (保持 V4 逻辑)。
         """
-        
+
         # 边界检查
         if char_offset >= len(doc.text):
             return None, None
-            
+
         # 只要当前字符是空格，就往后挪
         while char_offset < len(doc.text) and doc.text[char_offset].isspace():
             char_offset += 1
@@ -96,7 +93,7 @@ class TextMiner:
             if token.idx <= char_offset < (token.idx + len(token.text)):
                 target_token = token
                 break
-        
+
         # 如果修正后还是找不到 (比如选中的是纯空格)，则退出
         if not target_token:
             # print(f"    [Debug] No Spacy token found at aligned offset {char_offset}")
@@ -135,7 +132,7 @@ class TextMiner:
             if anchor_token:
                 anchor_chunk = get_chunk_containing(anchor_token)
                 if not anchor_chunk:
-                    anchor_chunk = doc[anchor_token.i : anchor_token.i + 1]
+                    anchor_chunk = doc[anchor_token.i: anchor_token.i + 1]
 
         if not anchor_chunk:
             return None, None
@@ -148,8 +145,9 @@ class TextMiner:
         a_end = anchor_chunk.end_char
         union_start = min(t_start, a_start)
         union_end = max(t_end, a_end)
-        
+
         return dino_phrase, (union_start, union_end)
+
 
 # === 波动分析器 (Jitter Analyzer) ===
 class JitterAnalyzer:
@@ -233,7 +231,20 @@ class GroundingAgent:
         self.model = load_model(self.cfg.dino_config_path, self.cfg.dino_weights_path)
 
     # 增加 image_path 参数
-    def run_grounding(self, core_phrase: str, specific_output_dir: str, image_path: str):
+    def run_grounding(self, core_phrase: str, specific_output_dir: str, image_path: str, return_bbox: bool = False):
+        """
+        运行 Grounding DINO 进行视觉定位
+
+        Args:
+            core_phrase: 要定位的文本短语
+            specific_output_dir: 输出目录
+            image_path: 图像路径
+            return_bbox: 是否返回边界框坐标（用于 bbox 模式）
+
+        Returns:
+            如果 return_bbox=False: (crop_path, confidence) 或 (None, confidence)
+            如果 return_bbox=True: (bbox, confidence) 或 (None, confidence)，其中 bbox = (x1, y1, x2, y2)
+        """
         if not self.model:
             self.logger.warning("Grounding DINO model not loaded.")
             return None, None
@@ -266,9 +277,18 @@ class GroundingAgent:
         best_idx = torch.argmax(logits).item()
         best_box = boxes[best_idx]  # (cx, cy, w, h) 归一化坐标
         best_logit = logits[best_idx].item()
-        
-        if best_logit < 0.50:
+
+        # if best_logit < 0.40:
+        #     return None, best_logit
+
+        # ==================== 修改开始 ==================== Rebuttal
+        # 从环境变量中读取阈值，如果没设置，默认使用 0.40 以兼容之前的逻辑
+        dino_thresh = float(os.environ.get("DINO_THRESH", 0.40))
+
+        if best_logit < dino_thresh:
+            self.logger.info(f"DINO best_logit ({best_logit:.2f}) < threshold ({dino_thresh}), skipping.")
             return None, best_logit
+        # ==================== 修改结束 ====================
 
         # --- 动态外扩逻辑 ---
         cx, cy, w_box, h_box = best_box.tolist()
@@ -301,6 +321,13 @@ class GroundingAgent:
         x2, y2 = min(w_img, int(x2)), min(h_img, int(y2))
 
         if x2 > x1 and y2 > y1:
+            # 如果只需要返回 bbox 坐标（bbox 模式）
+            if return_bbox:
+                bbox = (x1, y1, x2, y2)
+                self.logger.info(f"Best BBox: ({x1}, {y1}, {x2}, {y2}) (Conf: {best_logit:.2f})")
+                return bbox, best_logit
+
+            # 否则执行裁剪（crop 模式）
             crop_img = image_source[y1:y2, x1:x2]
 
             # image_source 是 RGB 格式 (PIL加载)，但 cv2.imwrite 需要 BGR 格式
@@ -310,8 +337,18 @@ class GroundingAgent:
             except Exception as e:
                 self.logger.warning(f"Color conversion failed: {e}")
 
-            # 清洗文件名
-            safe_phrase = core_phrase.replace(" ", "_")
+            # 清洗文件名：移除所有可能导致路径问题的字符
+            # 替换所有可能导致路径问题的字符为下划线
+            safe_phrase = re.sub(r'[<>:"/\\|?*]', '_', core_phrase)
+            # 替换空格为下划线
+            safe_phrase = safe_phrase.replace(" ", "_")
+            # 移除连续的下划线
+            safe_phrase = re.sub(r'_+', '_', safe_phrase)
+            # 移除开头和结尾的下划线
+            safe_phrase = safe_phrase.strip('_')
+            # 如果清理后为空，使用默认名称
+            if not safe_phrase:
+                safe_phrase = "crop"
             # 加上时间戳防止覆盖
             import time
             timestamp = int(time.time())
@@ -324,6 +361,7 @@ class GroundingAgent:
         else:
             self.logger.warning("Crop failed: Invalid coordinates.")
             return None, 0.0
+
 
 # === Mask工具函数 ===
 def mask_high_jitter_tokens(token_ids_list, span_range, tokenizer, mask_token_id=126336):

@@ -20,8 +20,8 @@ from pathlib import Path
 import sys
 import os
 
-# 添加可视化脚本的路径到sys.path
-sys.path.insert(0, '/data0/swz/LLaDA-VGR/test/scripts')
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "test" / "scripts"))
 from visualize_confidence_trends import (
     process_single_sample,
 )
@@ -36,13 +36,10 @@ use_dllm_cache = False  # using dLLM-Cache(https://github.com/maomaocun/dLLM-cac
 
 warnings.filterwarnings("ignore")
 # pretrained = "GSAI-ML/LLaDA-V"
-# 训练好的 LoRA 模型路径（使用绝对路径）
-pretrained = "/data0/swz/LLaDA-VGR/train/exp/llada_vgr_lora_rank64"
-# 基础模型路径（用于加载 tokenizer 和基础权重）
-model_base = "jiyatai/ReDiff"
-
-# 注意：model_name 需要包含 "lora" 关键字才能正确加载 LoRA 模型
+pretrained = os.environ.get("PRETRAINED_MODEL", str(REPO_ROOT / "train" / "exp" / "llada_v_lora_rank64_1227"))
+model_base = "GSAI-ML/LLaDA-V"
 model_name = "llava_llada_lora"
+
 device = "cuda:0"
 device_map = "cuda:0"
 
@@ -79,7 +76,7 @@ print(f"模型设备: {next(model.parameters()).device}")
 # 示例：
 # image_paths = "test0.png"  # 单图
 # image_paths = ["test0.png", "test.jpg", "bird.png"]  # 多图
-image_paths = ["evidence2.png"]  # 可以修改为多图列表
+image_paths = ["0000.jpg", "image82.jpg"]  # 可以修改为多图列表
 
 # 加载图片
 if isinstance(image_paths, str):
@@ -102,13 +99,11 @@ else:
 
 conv_template = "llava_llada" 
 # text = "In the image, a curious cat is standing in a bathroom. The cat is positioned near a white toilet, which <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> cover. The toilet seat is open, revealing a white bowl. To the left of the toilet, there's a black trash can. The wall of the bathroom is decorated with pink flamingo decals, adding a playful touch to the room. The floor of the bathroom also features a black and white checkered pattern, matching the overall aesthetic of the bathroom. The cat appears to be peering over the lid of the toilet, adding a touch of whimsy to the scene."
-text = "In the image, a brown cat with a white chest is standing in front of a white toilet, with its head resting inside the toilet bowl. The scene is set in a bathroom with a black and white checkered floor. The floor is complemented by a black and white checkered floor mat. The wall is adorned with a shower curtain featuring a pattern of pink flamingos. A white bathtub, equipped with <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> <|mdm_mask|>, is positioned to the right of the toilet. To the left of the toilet, a white trash can is placed on the floor, adding to the overall ambiance of the scene."
-# 为多图输入构建prompt：每张图片需要一个IMAGE_TOKEN
+text = "In the image, a curious cat is seen in a bathroom, peering into a toilet with its lid open. The bathroom features a black and white checkered floor, which extends to a brown mat on the right side of the frame. Above the toilet hangs a shower curtain adorned with pink flamingo decorations. The cat, <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> <|mdm_mask|> <|mdm_mask|>, appears to be intrigued by the toilet's interior, with its head visible inside the bowl. To the left, a stack of books is placed on the back of the toilet. Additionally, a small trash can is visible on the floor to the left of the toilet."
 num_images = len(images)
 if num_images == 1:
     image_tokens = DEFAULT_IMAGE_TOKEN
 else:
-    # 多图时，用空格分隔多个IMAGE_TOKEN
     image_tokens = " ".join([DEFAULT_IMAGE_TOKEN] * num_images)
 
 question = image_tokens + "\nYou are presented with a zoomed-in visual detail and a text description with missing parts. Task: Analyze the specific visual attributes (such as texture, pattern, color, and object shape) in the provided image crop. Instruction: The masked part of the text describes this specific visual evidence. Do not guess based on common language patterns. Instead, look closely at the image crop to accurately restore the missing text. What you see in the crop is the ground truth."

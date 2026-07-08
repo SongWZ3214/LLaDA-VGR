@@ -31,7 +31,12 @@ from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
 from transformers.activations import ACT2FN
-from transformers.cache_utils import Cache, DynamicCache, StaticCache
+from transformers.cache_utils import Cache, DynamicCache
+try:
+    from transformers.cache_utils import StaticCache
+except ImportError:
+    # StaticCache 在较旧版本的 transformers 中不存在，使用 DynamicCache 作为占位符
+    StaticCache = None
 from transformers.modeling_attn_mask_utils import AttentionMaskConverter
 from transformers.modeling_outputs import (
     BaseModelOutputWithPast,
@@ -814,7 +819,7 @@ class LLaDAPreTrainedModel(PreTrainedModel):
                 module.weight.data[module.padding_idx].zero_()
 
     def _setup_cache(self, cache_cls, max_batch_size, max_cache_len: Optional[int] = None):
-        if self.config._attn_implementation == "flash_attention_2" and cache_cls == StaticCache:
+        if StaticCache is not None and self.config._attn_implementation == "flash_attention_2" and cache_cls == StaticCache:
             raise ValueError(
                 "`static` cache implementation is not compatible with `attn_implementation==flash_attention_2` "
                 "make sure to use `sdpa` in the mean time, and open an issue at https://github.com/huggingface/transformers"
@@ -983,12 +988,12 @@ class LLaDAModel(LLaDAPreTrainedModel):
 
         past_seen_tokens = 0
         if use_cache:  # kept for BC (cache positions)
-            if not isinstance(past_key_values, StaticCache):
+            if StaticCache is None or not isinstance(past_key_values, StaticCache):
                 past_key_values = DynamicCache.from_legacy_cache(past_key_values)
                 past_seen_tokens = past_key_values.get_seq_length()
 
         if cache_position is None:
-            if isinstance(past_key_values, StaticCache):
+            if StaticCache is not None and isinstance(past_key_values, StaticCache):
                 raise ValueError("cache_position is a required argument when using StaticCache.")
             cache_position = torch.arange(
                 past_seen_tokens, past_seen_tokens + inputs_embeds.shape[1], device=inputs_embeds.device
@@ -1627,6 +1632,40 @@ class LLaDAModelLM(LLaDAPreTrainedModel):
             else:
                 return generated_tokens
 
+    @staticmethod
+    def create_bbox_mask(bboxes, image_token_len, grid_h, grid_w, device):
+        """
+        bboxes: (B, 4) normalized [x1, y1, x2, y2]
+        Returns: (B, image_token_len) boolean mask, True inside bbox
+        """
+        B = bboxes.shape[0]
+        # 创建网格坐标
+        x = torch.linspace(0, 1, grid_w, device=device)
+        y = torch.linspace(0, 1, grid_h, device=device)
+        grid_y, grid_x = torch.meshgrid(y, x, indexing='ij') # (H, W)
+        
+        # 展平为 (1, H*W)
+        flat_x = grid_x.flatten()[None, :] # (1, L)
+        flat_y = grid_y.flatten()[None, :]
+        
+        # 扩展 bbox 为 (B, 1)
+        x1 = bboxes[:, 0, None]
+        y1 = bboxes[:, 1, None]
+        x2 = bboxes[:, 2, None]
+        y2 = bboxes[:, 3, None]
+        
+        # 生成掩码: (B, L)
+        # 只有在 bbox 范围内的 grid 为 True
+        mask = (flat_x >= x1) & (flat_x <= x2) & (flat_y >= y1) & (flat_y <= y2)
+        
+        # 如果有额外的 image token (如 class token, newline token)，需要根据你的架构进行 padding
+        # 假设 image tokens 纯粹是 patch features，直接 resize 即可
+        if mask.shape[1] != image_token_len:
+             # 简单的处理：如果长度不一致（例如有 newline），可能需要手动对齐
+             # 这里假设 image_token_len 就是 grid_h * grid_w
+             pass
+             
+        return mask
 
     @add_start_docstrings_to_model_forward(LLaDA_INPUTS_DOCSTRING)
     @replace_return_docstrings(output_type=CausalLMOutputWithPast, config_class=_CONFIG_FOR_DOC)
@@ -1646,6 +1685,8 @@ class LLaDAModelLM(LLaDAPreTrainedModel):
         conversation_ids: Optional[torch.LongTensor] = None,
         revise: bool = False,
         revise_indices: Optional[torch.Tensor] = None,
+        sample_types: Optional[torch.LongTensor] = None,
+        bboxes: Optional[torch.FloatTensor] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
         r"""
         Args:
@@ -1661,12 +1702,14 @@ class LLaDAModelLM(LLaDAPreTrainedModel):
         ```python
         "Hey, are you conscious? Can you talk to me?\nI'm not conscious, but I can talk to you."
         ```"""
+        require_attn_loss = (bboxes is not None) and (revise) and (bboxes.sum() > -4)
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
+        if require_attn_loss:
+            output_attentions = True
 
         def forward_process_embeds(input_embeds, labels, revise_indices, eps=1e-3):
             b, l, d = input_embeds.shape
@@ -1675,16 +1718,38 @@ class LLaDAModelLM(LLaDAPreTrainedModel):
             masked_embed = self.model.embed_tokens(torch.tensor([126336]).to(input_embeds.device))
 
             if revise and revise_indices is not None:
-                # === Revise 模式 (Inpainting) ===
-                # 1. 不进行随机 Mask，上下文必须保持清晰
-                # 2. 强制 Mask 掉 revise_indices 指定的位置
-                # p_mask 在此处设为 1.0 (完全Mask) 用于后续 Loss 计算的统一
-                p_mask = torch.ones((b, l), device=input_embeds.device) 
+                # ------------------------------------------------------------------
+                # 核心修改：区分 VGR 样本 (Inpainting) 和 Replay 样本 (Standard MDM)
+                # ------------------------------------------------------------------
                 
-                # 逻辑修正：revise_indices 的位置设为 True (需要被 Mask)
-                masked_indices = revise_indices.bool() 
+                # 1. 识别哪些是 VGR 样本
+                # 如果某一行 revise_indices 全为 False (sum==0)，说明它是 Replay 样本
+                is_vgr_sample = revise_indices.sum(dim=-1) > 0  # shape: (b,)
+                is_vgr_sample = is_vgr_sample.unsqueeze(-1)     # shape: (b, 1)
+
+                # 2. 准备 VGR 策略的 Mask (Inpainting)
+                # VGR 样本使用固定的 revise_indices
+                mask_vgr = revise_indices.bool() 
+                # VGR 样本的 p_mask 设为 1.0 (用于兼容性，实际不影响 Inpainting loss)
+                p_mask_vgr = torch.ones((b, l), device=input_embeds.device)
+
+                # 3. 准备 Replay 策略的 Mask (Standard MDM 随机遮盖)
+                # 为 Replay 样本生成随机 Mask (和 else 分支逻辑一样)
+                t = torch.rand(b, device=input_embeds.device)
+                p_mask_random = (1 - eps) * t + eps
+                p_mask_random = p_mask_random[:, None].repeat(1, l)
                 
-                # 确保 labels 为 -100 (Prompt部分) 的地方不被 Mask (虽然 revise_indices 应该已经处理好了，但加一层保险)
+                # 生成随机布尔掩码
+                mask_random = torch.rand((b, l), device=input_embeds.device) < p_mask_random
+                
+                # 4. 【关键】使用 torch.where 进行混合
+                # 如果是 VGR 样本，取 mask_vgr；否则取 mask_random
+                masked_indices = torch.where(is_vgr_sample, mask_vgr, mask_random)
+                
+                # 同样混合 p_mask (虽然 forward 里的 revise 分支可能只用计数归一化，但保持正确性更好)
+                p_mask = torch.where(is_vgr_sample, p_mask_vgr, p_mask_random)
+
+                # 5. 确保 Prompt 部分 (-100) 永远不被 Mask
                 valid_mask = (labels != -100)
                 masked_indices = masked_indices & valid_mask
 
@@ -1753,33 +1818,149 @@ class LLaDAModelLM(LLaDAPreTrainedModel):
                                             reduction='none') / p_mask[masked_indices]
                 loss = torch.sum(token_loss / noisy_data_length[masked_indices]) / labels.shape[0]
             else:
-                # --- Revise / Inpainting 训练 Loss ---
+                # --- 混合训练 Loss (Revise + Replay + Negative) ---
+                
+                # 1. 计算 CE Loss (用于正样本和 Replay)
+                # shape: (b, l)
+                ce_loss = F.cross_entropy(logits.permute(0, 2, 1), labels, reduction='none')
+                
+                # 2. 计算概率 (用于负样本 Unlikelihood Loss)
+                # 只需要计算目标 token 的概率
+                probs = F.softmax(logits, dim=-1) # (b, l, vocab)
+                # gather 获取 labels 对应位置的概率 P(x_target)
+                # labels 必须把 -100 换成 0 才能 gather，之后再 mask 掉
+                gather_labels = labels.clone()
+                gather_labels[gather_labels == -100] = 0
+                target_probs = torch.gather(probs, -1, gather_labels.unsqueeze(-1)).squeeze(-1) # (b, l)
+
                 losses = []
+                
+                # 获取样本类型，如果未传入则默认全为 0 (Replay/Positive兼容)
+                if sample_types is None:
+                    sample_types = torch.zeros(logits.shape[0], dtype=torch.long, device=logits.device)
+
                 for i in range(logits.shape[0]): # Batch loop
-                    # 确定当前样本需要计算 Loss 的位置
-                    # 只有 revise_indices 为 1 的位置才计算 Loss
-                    target_indices = masked_indices[i] 
-                                        
-                    if torch.sum(target_indices) > 0:
-                        # 计算 CE Loss
-                        # 注意：这里不需要除以 p_mask，因为在 Inpainting 中 p=1 (确定性 mask)
-                        # 或者为了兼容性，保留除以 p_mask (此时 p_mask 也是 1)
-                        token_loss = F.cross_entropy(
-                            logits[i][target_indices], 
-                            labels[i][target_indices], 
-                            ignore_index=-100, 
-                            reduction='none'
-                        )
-                        
-                        # 归一化：除以该样本中 Mask 的总长度，而不是整个序列长度
-                        # 这样可以避免 Mask 区域很小时 Gradient 过小
-                        revise_len = torch.sum(target_indices)
-                        revise_loss = torch.sum(token_loss) / (revise_len + 1e-8)
-                        losses.append(revise_loss)
-                    else:
+                    current_type = sample_types[i].item()
+                    target_mask = masked_indices[i] # revise mask
+                    
+                    # 如果该样本没有被 mask (例如 Replay 样本随机 mask 未命中)，跳过
+                    if torch.sum(target_mask) == 0:
                         losses.append(torch.tensor(0.0, device=logits.device, requires_grad=True))
+                        continue
+
+                    if current_type == 2: 
+                        # === [Negative Sample: local_occluded] ===
+                        # 目标：最小化 P(target)，即最大化 -log(1 - P(target))
+                        # Unlikelihood Loss
+                        
+                        sample_probs = target_probs[i][target_mask]
+                        # 添加 eps 防止 log(0)
+                        unlikelihood_loss = -torch.log(1 - sample_probs + 1e-6)
+                        
+                        # 负样本通常需要一个权重系数 (alpha)，防止过度惩罚导致分布坍塌
+                        # 这里简单取平均，你也可以乘以一个系数比如 0.5 或 1.0
+                        sample_loss = torch.mean(unlikelihood_loss)
+                        
+                    elif current_type == 1 or current_type == 3:
+                        # === [Positive Sample: local_clear / local_blur] ===
+                        # 目标：最大化 P(target) -> CrossEntropy
+                        # VGR Inpainting 逻辑：归一化分母为 mask 数量
+                        
+                        sample_token_loss = ce_loss[i][target_mask]
+                        sample_p_mask = p_mask[i][target_mask]
+                        weighted_loss = sample_token_loss / sample_p_mask
+                        
+                        sample_loss = torch.sum(weighted_loss) / (target_mask.sum() + 1e-8)
+                        
+                    else: # current_type == 0
+                        # === [Replay Sample: global_caption] ===
+                        # 标准 MDM 逻辑
+                        
+                        sample_token_loss = ce_loss[i][target_mask]
+                        sample_p_mask = p_mask[i][target_mask]
+                        weighted_loss = sample_token_loss / sample_p_mask
+                        
+                        # 归一化：除以有效长度
+                        sample_loss = torch.sum(weighted_loss) / (noisy_data_length[i][0] + 1e-8)
+
+                    losses.append(sample_loss)
                 
                 loss = torch.mean(torch.stack(losses))
+                
+            if require_attn_loss:
+                # 1. 提取最后一层的 Attention Weights
+                # outputs.attentions 是 tuple, 形状 (batch, heads, seq_len, seq_len)
+                # 取最后一层，并对多头取平均
+                attn_map = outputs.attentions[-1].mean(dim=1) # (B, L, L)
+                
+                # 2. 定位 Image Tokens 和 Text Tokens
+                # 假设 input_ids 中 IMAGE_TOKEN_INDEX (通常 -200 或特定ID) 标记了图片位置
+                # 或者根据 LLaVA 架构，图片通常在开头。
+                # 这是一个简化的定位逻辑，你需要根据实际 Tokenizer 调整：
+                image_token_id = self.config.image_token_index if hasattr(self.config, 'image_token_index') else -200
+                # 注意：经过 forward_process_embeds 后 input_ids 可能对不上，建议用 input_ids 原始值定位
+                
+                # 更稳健的方法：假设图片在开头，长度固定 (例如 SigLIP 384 -> 24x24=576 tokens)
+                # 你需要知道你的 vision tower patch size
+                # 假设 grid size 为 24x24 (SigLIP-SO400M-384)
+                grid_h, grid_w = 27, 27 
+                num_img_tokens = grid_h * grid_w 
+                
+                # 图片起始位置（考虑 BOS）
+                img_start_idx = 1 
+                img_end_idx = img_start_idx + num_img_tokens
+                
+                # 3. 生成 BBox Mask
+                # 筛选出 Scheme 3 的样本 (sample_type == 3)
+                if sample_types is None:
+                    # 如果没传 sample_types，假设全都是
+                    valid_sample_mask = torch.ones(logits.shape[0], dtype=torch.bool, device=logits.device)
+                else:
+                    valid_sample_mask = (sample_types == 3)
+
+                bbox_mask = self.create_bbox_mask(bboxes, num_img_tokens, grid_h, grid_w, logits.device) # (B, Img_Len)
+                
+                attn_losses = []
+                
+                for i in range(logits.shape[0]):
+                    if not valid_sample_mask[i] or bboxes[i][0] < 0: 
+                        continue
+                        
+                    # 4. 获取 Target Text 对 Image 的 Attention
+                    # 我们只关心 revise 部分 (Inpainting Target) 对 图片的 Attention
+                    # masked_indices[i] 标记了 target text 的位置
+                    target_text_mask = masked_indices[i] # (L,) boolean
+                    
+                    if target_text_mask.sum() == 0: continue
+
+                    # 提取该样本的 Attention Map 切片
+                    # Rows: Target Text Tokens, Cols: Image Tokens
+                    # Shape: (Num_Target_Tokens, Num_Image_Tokens)
+                    curr_attn = attn_map[i, :, img_start_idx:img_end_idx]
+                    curr_attn = curr_attn[target_text_mask] 
+                    
+                    # 5. 计算 Attention Loss (Energy Ratio)
+                    # 分子：落在 BBox 内的 Attention
+                    # 分母：落在整个图片上的 Attention
+                    
+                    curr_bbox_mask = bbox_mask[i] # (Img_Len,)
+                    
+                    attn_in_box = curr_attn[:, curr_bbox_mask].sum(dim=-1)
+                    attn_total = curr_attn.sum(dim=-1) + 1e-8
+                    
+                    # Ratio: box内注意力占比
+                    ratio = attn_in_box / attn_total
+                    
+                    # Loss: 1 - ratio (希望 ratio 越大越好)
+                    # 可以加一个 lambda 权重，比如 0.5
+                    curr_attn_loss = 1.0 - ratio.mean()
+                    
+                    attn_losses.append(curr_attn_loss)
+                
+                if len(attn_losses) > 0:
+                    loss_attn = torch.stack(attn_losses).mean()
+                    # 将 Attention Loss 加到总 Loss 中，权重可调 (例如 0.1 或 1.0)
+                    loss += 0.5 * loss_attn
 
         if not return_dict:
             output = (logits,) + outputs[1:]

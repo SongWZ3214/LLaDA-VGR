@@ -58,6 +58,14 @@ local_rank = None
 
 IS_TOKENIZER_GREATER_THAN_0_14 = version.parse(tokenizers.__version__) >= version.parse("0.14")
 
+SAMPLE_TYPE_MAP = {
+    "global_caption": 0,
+    "local_clear": 1,
+    "local_blur": 1,
+    "local_occluded": 2,
+    "local_repair": 3,
+}
+
 import warnings
 warnings.filterwarnings("ignore")
 @dataclass
@@ -1200,6 +1208,11 @@ class WebDatasetSupervisedDataset(torch.utils.data.IterableDataset):
                 result["is_plain"] = False
                 result["is_llada"] = True
             
+            if "tag" in json_data:
+                tag = json_data.get("tag", "global_caption")
+                sample_type_id = SAMPLE_TYPE_MAP.get(tag, 0)
+                result["sample_type"] = torch.tensor(sample_type_id, dtype=torch.long)
+            
             return result
         
         except Exception as exn:
@@ -1405,6 +1418,10 @@ class LazySupervisedDataset(Dataset):
 
     def _get_item(self, i) -> Dict[str, torch.Tensor]:
         sources = self.list_data_dict[i]
+        
+        if "tag" in sources:
+            tag = sources.get("tag", "global_caption")
+            sample_type_id = SAMPLE_TYPE_MAP.get(tag, 0)
         # 检查是否有 revise 字段
         if 'revise' in sources:
             revise_flag = 1
@@ -1486,6 +1503,29 @@ class LazySupervisedDataset(Dataset):
         else:
             sources = copy.deepcopy([e["conversations"] for e in sources])
 
+        bbox = torch.tensor([-1.0, -1.0, -1.0, -1.0], dtype=torch.float)
+        data_item = self.list_data_dict[i]
+        
+        if "bbox" in data_item: # 假设 JSON 中 bbox 是 [x, y, w, h] 格式 (COCO format)
+            raw_bbox = data_item["bbox"]
+            
+            # 获取原图尺寸 (W, H)
+            # 注意：self.process_image 返回了 image_size
+            # 假设 image 变量结构是: [(tensor, (width, height), "image")]
+            # 如果是多图，取第一张图的尺寸 (Scheme 3 通常是单图)
+            if "image" in data_item and image is not None:
+                orig_w, orig_h = image[0][1] 
+                
+                # 归一化 BBox 到 0-1
+                x, y, w, h = raw_bbox
+                x1 = x / orig_w
+                y1 = y / orig_h
+                x2 = (x + w) / orig_w
+                y2 = (y + h) / orig_h
+                
+                # 截断到 0-1 范围防止越界
+                bbox = torch.tensor([x1, y1, x2, y2], dtype=torch.float).clamp(0, 1)
+        
         has_image = ("image" in self.list_data_dict[i]) or ("video" in self.list_data_dict[i])
         data_dict = preprocess(sources, self.tokenizer, has_image=has_image)
 
@@ -1649,6 +1689,9 @@ class LazySupervisedDataset(Dataset):
             # 简单粗暴做法：只要不是 revise 的地方，全设为 -100
             non_revise_mask = ~revise_indices
             data_dict['labels'][non_revise_mask] = -100
+        
+        data_dict["sample_type"] = torch.tensor(sample_type_id, dtype=torch.long)
+        data_dict["bbox"] = bbox
                     
         return data_dict
 
@@ -1688,8 +1731,20 @@ class DataCollatorForSupervisedDataset(object):
             )
             
             # 处理 revise_indices（如果存在）
-            if 'revise_indices' in instances[0]:
-                revise_indices = tuple([instance['revise_indices'] for instance in instances])
+            # 检查 batch 中是否有任何实例包含 revise_indices
+            has_revise_indices = any('revise_indices' in instance for instance in instances)
+            if has_revise_indices:
+                # 为没有 revise_indices 的实例创建全 False 的 tensor
+                revise_indices_list = []
+                for instance in instances:
+                    if 'revise_indices' in instance:
+                        revise_indices_list.append(instance['revise_indices'])
+                    else:
+                        # 创建与 labels 相同长度的全 False tensor
+                        labels_len = instance['labels'].shape[0]
+                        revise_indices_list.append(torch.zeros(labels_len, dtype=torch.bool, device=instance['labels'].device))
+                
+                revise_indices = tuple(revise_indices_list)
                 revise_indices = [_revise_indices[: self.tokenizer.model_max_length] for _revise_indices in revise_indices]
                 revise_indices = self.pad_sequence(revise_indices, batch_first=True, padding_value=False)
                 batch['revise_indices'] = revise_indices
@@ -1705,6 +1760,15 @@ class DataCollatorForSupervisedDataset(object):
             batch = dict(input_ids=input_ids, labels=labels.long() if labels.dtype == torch.int32 else labels, attention_mask=input_ids.ne(self.tokenizer.pad_token_id))
             # batch = dict(input_ids=input_ids, labels=labels, attention_mask=input_ids.ne(self.tokenizer.pad_token_id), ids=ids)
 
+        if "sample_type" in instances[0]:
+            sample_types = [instance["sample_type"] for instance in instances]
+            # 堆叠成 (batch_size,) 的 tensor
+            batch["sample_types"] = torch.stack(sample_types)
+            
+        if "bbox" in instances[0]:
+            bboxes = [instance["bbox"] for instance in instances]
+            batch["bboxes"] = torch.stack(bboxes) # Shape: (batch_size, 4)
+        
         if "image" in instances[0]:
             images = [instance["image"] for instance in instances]
 
@@ -2012,6 +2076,30 @@ def train(attn_implementation=None):
                 model.to(torch.float16)
         rank0_print("Adding LoRA adapters...")
         model = get_peft_model(model, lora_config)
+        
+        # 如果指定了 lora_weight_path，则加载之前训练好的 LoRA 权重
+        if training_args.lora_weight_path and len(training_args.lora_weight_path) > 0:
+            rank0_print(f"Loading LoRA weights from {training_args.lora_weight_path}")
+            # 加载 state_dict
+            # 注意：这里假设你不需要合并，只是继续训练 adapter
+            # 我们手动加载权重，因为 get_peft_model 已经初始化了结构
+            adapter_path = os.path.join(training_args.lora_weight_path, "adapter_model.safetensors")
+            
+            if os.path.exists(adapter_path):
+                from safetensors.torch import load_file
+                if adapter_path.endswith(".safetensors"):
+                    adapters_weights = load_file(adapter_path)
+                else:
+                    adapters_weights = torch.load(adapter_path, map_location="cpu")
+                
+                # 处理一下 key 的名字，确保匹配
+                # PeftModel 保存时通常没有 'base_model.model.' 前缀，但加载时需要匹配当前模型结构
+                # 简单的做法是直接使用 set_peft_model_state_dict (如果版本兼容)
+                from peft.utils import set_peft_model_state_dict
+                set_peft_model_state_dict(model, adapters_weights)
+                rank0_print("Successfully loaded LoRA weights.")
+            else:
+                rank0_print(f"Warning: LoRA weight file not found in {training_args.lora_weight_path}")
 
     if "mistral" in model_args.model_name_or_path.lower() or "mixtral" in model_args.model_name_or_path.lower() or "zephyr" in model_args.model_name_or_path.lower():
         tokenizer = transformers.AutoTokenizer.from_pretrained(model_args.model_name_or_path, cache_dir=training_args.cache_dir, model_max_length=training_args.model_max_length, padding_side="left")

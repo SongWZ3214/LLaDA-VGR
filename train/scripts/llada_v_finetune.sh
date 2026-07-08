@@ -18,7 +18,11 @@ export DS_SKIP_GDS=1
 
 # 节点和GPU数量（如果未提供参数，使用默认值）
 num_node=${1:-1}  # 默认1个节点
-gpu_num=${2:-8}  # 默认8个GPU
+gpu_num=${2:-4}  # 默认4个GPU（如果遇到OOM，可以减少到2或1）
+
+# 激活 conda 环境
+source /home/vipuser/miniconda3/etc/profile.d/conda.sh
+conda activate llada
 
 # 获取脚本所在目录的绝对路径，并设置 PYTHONPATH
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -42,7 +46,7 @@ echo "node_rank ${RANK}"
 echo "gpu_num ${gpu_num}"
 echo "num_node ${num_node}"
 
-LLM_VERSION="jiyatai/ReDiff"
+LLM_VERSION="GSAI-ML/LLaDA-V"
 LLM_VERSION_CLEAN="${LLM_VERSION//\//_}"
 VISION_MODEL_VERSION="google/siglip2-so400m-patch14-384"
 VISION_MODEL_VERSION_CLEAN="${VISION_MODEL_VERSION//\//_}"
@@ -51,15 +55,17 @@ VISION_MODEL_VERSION_CLEAN="${VISION_MODEL_VERSION//\//_}"
 
 PROMPT_VERSION="llava_llada"
 
-BASE_RUN_NAME="llada_vgr_lora_rank64"
+BASE_RUN_NAME="llada_v_lora_rank64_1227"
 echo "BASE_RUN_NAME: ${BASE_RUN_NAME}"
 
 # 数据路径
-DATA_PATH="/data0/swz/refCOCO+/refcoco+_training_data.json"
-IMAGE_FOLDER="/data0/swz/refCOCO+/images/cropped"
+DATA_PATH="/data0/swz/RefCOCO+/refcoco+_training_data_new.json"
+IMAGE_FOLDER="/data0/swz/RefCOCO+"
 
 # DeepSpeed 配置文件选择
 # 如果显存够（A100 80G），建议用 zero2.json 速度更快；显存吃紧用 zero3.json
+# 如果遇到系统内存OOM，使用 zero3.json 可以减少内存占用
+# 当前GPU显存使用约23GB，还有很大空间，使用ZeRO-2可以显著提升速度（快2-3倍）
 DS_CONFIG="scripts/zero2.json" 
 
 ACCELERATE_CPU_AFFINITY=1 torchrun --nproc_per_node=${gpu_num} --nnodes=${num_node} --master_addr=${MASTER_ADDR} --master_port ${MASTER_PORT} --node_rank=${RANK} \
@@ -76,7 +82,6 @@ ACCELERATE_CPU_AFFINITY=1 torchrun --nproc_per_node=${gpu_num} --nnodes=${num_no
     --lora_dropout 0.05 \
     --lora_target_modules "q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj" \
     --modules_to_save "mm_projector" \
-    --mm_tunable_parts="mm_mlp_adapter" \
     --vision_tower ${VISION_MODEL_VERSION} \
     --mm_projector_type mlp2x_gelu \
     --mm_vision_select_layer -2 \
@@ -89,23 +94,22 @@ ACCELERATE_CPU_AFFINITY=1 torchrun --nproc_per_node=${gpu_num} --nnodes=${num_no
     --bf16 True \
     --run_name $BASE_RUN_NAME \
     --output_dir "exp/$BASE_RUN_NAME" \
-    --num_train_epochs 5 \
-    --per_device_train_batch_size 4 \
+    --num_train_epochs 3 \
+    --per_device_train_batch_size 8 \
     --per_device_eval_batch_size 4 \
-    --gradient_accumulation_steps 4 \
-    --evaluation_strategy "no" \
+    --gradient_accumulation_steps 8 \
+    --eval_strategy "no" \
     --save_strategy "steps" \
-    --save_steps 500 \
-    --save_total_limit 2 \
+    --save_steps 100 \
     --learning_rate 1e-4 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type "cosine" \
     --logging_steps 1 \
     --tf32 True \
-    --model_max_length 1024 \
+    --model_max_length 2048 \
     --gradient_checkpointing True \
-    --dataloader_num_workers 4 \
+    --dataloader_num_workers 2 \
     --lazy_preprocess True \
     --report_to tensorboard \
     --torch_compile False \

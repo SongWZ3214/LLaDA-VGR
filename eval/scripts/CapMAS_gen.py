@@ -20,7 +20,10 @@ import logging
 from datetime import datetime
 import multiprocessing as mp
 from multiprocessing import Process, Queue, Manager
+import argparse
 
+import sys
+sys.path.insert(0, '/data0/swz/LLaDA-VGR/train')
 from refinement_engine import RefinementEngine
 
 prompt_interval_steps = 25
@@ -31,37 +34,26 @@ use_dllm_cache = False  # using dLLM-Cache(https://github.com/maomaocun/dLLM-cac
 
 warnings.filterwarnings("ignore")
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_ROOT = REPO_ROOT.parent
-
-PRETRAINED = os.environ.get("PRETRAINED_MODEL", str(REPO_ROOT / "train" / "exp" / "llada_v_lora_rank64_1227"))
-MODEL_BASE = "GSAI-ML/LLaDA-V"
-MODEL_NAME = "llava_llada_lora"
+# 配置参数
+PRETRAINED = "/data0/swz/LLaDA-VGR/train/exp/llada_vgr_lora_rank64_1225"  # 训练好的模型路径
+MODEL_BASE = "jiyatai/ReDiff"  # 基础模型路径
+MODEL_NAME = "llava_llada_lora"  # 模型名称
 DEVICE = "cuda:0"
 DEVICE_MAP = "cuda:0"
-NUM_GPUS = 4
+NUM_GPUS = 4  # 使用的GPU数量
 
+# RefinementEngine 配置参数
 VISION_TOWER_PATH = "google/siglip2-so400m-patch14-384"
-MAX_STEPS = 6
-JITTER_THRESHOLD = 0.35
-MASK_EXPANSION = 2
-TEMP_DIR = "./cropped_image"
-IMAGE_INPUT_MODE = "both"
-MASK_MODE = "span"
-TOKEN_SELECTION_MODE = "jitter_confidence"
+MAX_STEPS = 5  # 最大迭代次数
+JITTER_THRESHOLD = 0.35  # Jitter 阈值
+MASK_EXPANSION = 4  # Mask 扩张
+TEMP_DIR = "./cropped_image"  # 临时文件目录
 
-
-DATASET_PATH = os.environ.get(
-    "DETAILCAPS_DATASET",
-    str(WORKSPACE_ROOT / "exp" / "DetailCaps" / "DetailCaps-4870_refined_EN.parquet"),
-)
-IMAGE_DIR = os.environ.get("DETAILCAPS_IMAGE_DIR", str(WORKSPACE_ROOT / "exp" / "DetailCaps" / "extracted_images"))
-OUTPUT_DIR = os.environ.get(
-    "DETAILCAPS_OUTPUT_DIR",
-    str(WORKSPACE_ROOT / "exp" / "DetailCaps" / "result" / "llada_vgr_0105"),
-)
-START_INDEX = 0
-END_INDEX = None
+# capmas 数据集路径和输出路径
+IMAGE_DIR = "/data0/swz/exp/CapMAS/data/images_capmas"  # 图片文件目录
+OUTPUT_JSON = "/data0/swz/exp/CapMAS/data/capmas_captions.json"  # 输出JSON文件
+START_INDEX = 0  # 起始索引（包含），设置为None表示从0开始
+END_INDEX = None  # 终止索引（不包含），设置为None表示处理到末尾
 
 # 生成参数
 GEN_STEPS = 128
@@ -71,7 +63,7 @@ PREFIX_REFRESH_INTERVAL = 32
 THRESHOLD = 1
 
 # Prompt设置
-PROMPT_TEXT = "Please describe the image in detail."
+PROMPT_TEXT = "Please describe the image in detail. Use less absolute directional descriptions. Do not repeat information."
 
 BASE64_RE = re.compile(r'^[A-Za-z0-9+/]+={0,2}$')
 
@@ -275,7 +267,7 @@ def load_image_from_data(data):
         logger.warning(f"无法处理的图像数据类型: {type(data)}")
     return None
 
-def process_single_sample(refinement_engine: RefinementEngine, image_data, prompt_text):
+def process_single_sample(refinement_engine: RefinementEngine, image_data, prompt_text, process_logger=None):
     """
     处理单个样本，使用 RefinementEngine 进行迭代细化
     
@@ -283,6 +275,7 @@ def process_single_sample(refinement_engine: RefinementEngine, image_data, promp
         refinement_engine: RefinementEngine 实例
         image_data: 图像数据（bytes、base64字符串或本地路径）
         prompt_text: 提示文本
+        process_logger: 进程日志记录器（可选）
         
     Returns:
         结果字典，包含 generated_text 和其他信息
@@ -316,10 +309,14 @@ def process_single_sample(refinement_engine: RefinementEngine, image_data, promp
         return result_dict
         
     except Exception as e:
-        logger.error(f"Error during refinement: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return {'error': str(e)}
+        error_msg = str(e)
+        # 优先使用 process_logger，如果没有则使用全局 logger
+        log_func = process_logger if process_logger else logger
+        if log_func:
+            log_func.error(f"Error during refinement: {e}")
+            import traceback
+            log_func.error(traceback.format_exc())
+        return {'error': error_msg}
     finally:
         # 清理临时文件
         if temp_file and os.path.exists(temp_file):
@@ -374,20 +371,22 @@ def find_failed_samples(output_dir: Path) -> List[Tuple[int, dict, Path]]:
 
 def process_data_chunk(
     gpu_id: int,
-    data_chunk: pd.DataFrame,
-    output_dir: Path,
+    image_files: List[Tuple[str, Path]],  # List of (filename, image_path)
+    output_json: str,
     result_queue: Queue,
-    log_file: str
+    log_file: str,
+    json_lock: mp.Lock
 ):
     """
     在单个GPU上处理数据块
     
     Args:
         gpu_id: GPU ID (0-3)
-        data_chunk: 要处理的数据块
-        output_dir: 输出目录
+        image_files: 要处理的图片文件列表 [(filename, image_path), ...]
+        output_json: 输出JSON文件路径
         result_queue: 用于返回结果的队列
         log_file: 日志文件路径
+        json_lock: JSON文件写入锁
     """
     # 为每个进程设置独立的日志
     process_logger = logging.getLogger(f"GPU_{gpu_id}")
@@ -424,9 +423,6 @@ def process_data_chunk(
             device=device,
             max_steps=MAX_STEPS,
             jitter_threshold=JITTER_THRESHOLD,
-            image_input_mode=IMAGE_INPUT_MODE,
-            mask_mode=MASK_MODE,
-            token_selection_mode=TOKEN_SELECTION_MODE,
             mask_expansion=MASK_EXPANSION,
             temp_dir=temp_dir_gpu,  # 每个GPU使用独立的临时目录
             logger=process_logger
@@ -436,24 +432,27 @@ def process_data_chunk(
         successful_count = 0
         failed_count = 0
         
-        process_logger.info(f"GPU {gpu_id}: 开始处理 {len(data_chunk)} 条数据...")
+        process_logger.info(f"GPU {gpu_id}: 开始处理 {len(image_files)} 张图片...")
         
-        for idx, row in tqdm(data_chunk.iterrows(), total=len(data_chunk), 
-                             desc=f"GPU {gpu_id} 处理数据"):
+        for filename, image_path in tqdm(image_files, desc=f"GPU {gpu_id} 处理图片"):
             try:
-                # 从文件系统读取图像文件
-                image_path = Path(IMAGE_DIR) / f"{idx:04d}.jpg"
                 if not image_path.exists():
-                    process_logger.warning(f"GPU {gpu_id}: 警告: 第 {idx} 条数据的图片文件不存在: {image_path}")
-                    error_result = {
-                        'index': int(idx),
-                        'error': f'Image file not found: {image_path}',
-                        **{col: str(row[col]) if not pd.isna(row[col]) else None 
-                           for col in data_chunk.columns if col != 'binary'}
-                    }
-                    output_file = output_dir / f"{idx:06d}.json"
-                    with open(output_file, 'w', encoding='utf-8') as f:
-                        json.dump(error_result, f, ensure_ascii=False, indent=2)
+                    process_logger.warning(f"GPU {gpu_id}: 警告: 图片文件不存在: {image_path}")
+                    # 更新JSON文件，标记为错误
+                    with json_lock:
+                        try:
+                            if Path(output_json).exists():
+                                with open(output_json, 'r', encoding='utf-8') as f:
+                                    data = json.load(f)
+                            else:
+                                data = {}
+                            data[filename] = None  # 保持为null表示失败
+                            with open(output_json, 'w', encoding='utf-8') as f:
+                                json.dump(data, f, ensure_ascii=False, indent=2)
+                        except Exception as e:
+                            process_logger.error(f"GPU {gpu_id}: 更新JSON文件失败: {e}")
+                            import traceback
+                            process_logger.error(traceback.format_exc())
                     failed_count += 1
                     continue
                 
@@ -463,51 +462,76 @@ def process_data_chunk(
                 # 处理样本
                 result = process_single_sample(
                     refinement_engine,
-                    image_data, PROMPT_TEXT
+                    image_data, PROMPT_TEXT,
+                    process_logger=process_logger
                 )
                 
-                if result is None:
-                    error_result = {
-                        'index': int(idx),
-                        'error': 'Failed to load or process image',
-                        'image_path': str(image_path),
-                        **{col: str(row[col]) if not pd.isna(row[col]) else None for col in data_chunk.columns}
-                    }
-                    output_file = output_dir / f"{idx:06d}.json"
-                    with open(output_file, 'w', encoding='utf-8') as f:
-                        json.dump(error_result, f, ensure_ascii=False, indent=2)
+                if result is None or 'error' in result:
+                    process_logger.warning(f"GPU {gpu_id}: 处理图片失败: {filename}")
+                    # 更新JSON文件，标记为错误
+                    with json_lock:
+                        try:
+                            if Path(output_json).exists():
+                                with open(output_json, 'r', encoding='utf-8') as f:
+                                    data = json.load(f)
+                            else:
+                                data = {}
+                            data[filename] = None  # 保持为null表示失败
+                            with open(output_json, 'w', encoding='utf-8') as f:
+                                json.dump(data, f, ensure_ascii=False, indent=2)
+                        except Exception as e:
+                            process_logger.error(f"GPU {gpu_id}: 更新JSON文件失败: {e}")
+                            import traceback
+                            process_logger.error(traceback.format_exc())
                     failed_count += 1
                     continue
                 
-                # 构建结果
-                data_result = {
-                    'index': int(idx),
-                    'image_path': str(image_path),
-                    **result,
-                    **{col: str(row[col]) if not pd.isna(row[col]) else None 
-                       for col in data_chunk.columns if col != 'binary'}
-                }
+                # 获取生成的caption
+                generated_text = result.get('generated_text', '')
                 
-                # 保存结果
-                output_file = output_dir / f"{idx:06d}.json"
-                with open(output_file, 'w', encoding='utf-8') as f:
-                    json.dump(data_result, f, ensure_ascii=False, indent=2)
+                # 更新JSON文件
+                with json_lock:
+                    try:
+                        # 读取现有JSON文件（如果文件不存在，创建空字典）
+                        if Path(output_json).exists():
+                            with open(output_json, 'r', encoding='utf-8') as f:
+                                data = json.load(f)
+                        else:
+                            data = {}
+                        # 更新对应文件的caption
+                        data[filename] = generated_text
+                        # 写回JSON文件
+                        with open(output_json, 'w', encoding='utf-8') as f:
+                            json.dump(data, f, ensure_ascii=False, indent=2)
+                        process_logger.debug(f"GPU {gpu_id}: 成功更新JSON文件，文件名: {filename}")
+                    except Exception as e:
+                        process_logger.error(f"GPU {gpu_id}: 更新JSON文件失败: {e}")
+                        import traceback
+                        process_logger.error(traceback.format_exc())
+                        failed_count += 1
+                        continue
                 
                 successful_count += 1
                 
             except Exception as e:
-                process_logger.error(f"GPU {gpu_id}: 处理第 {idx} 条数据时出错: {e}")
+                process_logger.error(f"GPU {gpu_id}: 处理图片 {filename} 时出错: {e}")
                 import traceback
                 process_logger.error(traceback.format_exc())
-                error_result = {
-                    'index': int(idx),
-                    'error': str(e),
-                    **{col: str(row[col]) if not pd.isna(row[col]) else None 
-                       for col in data_chunk.columns if col != 'binary'}
-                }
-                output_file = output_dir / f"{idx:06d}.json"
-                with open(output_file, 'w', encoding='utf-8') as f:
-                    json.dump(error_result, f, ensure_ascii=False, indent=2)
+                # 更新JSON文件，标记为错误
+                with json_lock:
+                    try:
+                        if Path(output_json).exists():
+                            with open(output_json, 'r', encoding='utf-8') as f:
+                                data = json.load(f)
+                        else:
+                            data = {}
+                        data[filename] = None  # 保持为null表示失败
+                        with open(output_json, 'w', encoding='utf-8') as f:
+                            json.dump(data, f, ensure_ascii=False, indent=2)
+                    except Exception as e2:
+                        process_logger.error(f"GPU {gpu_id}: 更新JSON文件失败: {e2}")
+                        import traceback
+                        process_logger.error(traceback.format_exc())
                 failed_count += 1
         
         # 返回结果
@@ -527,8 +551,8 @@ def process_data_chunk(
         result_queue.put({
             'gpu_id': gpu_id,
             'successful_count': 0,
-            'failed_count': len(data_chunk),
-            'total_count': len(data_chunk),
+            'failed_count': len(image_files),
+            'total_count': len(image_files),
             'error': str(e)
         })
 
@@ -575,7 +599,8 @@ def reprocess_failed_samples(
             # 处理样本
             result = process_single_sample(
                 refinement_engine,
-                image_data, PROMPT_TEXT
+                image_data, PROMPT_TEXT,
+                process_logger=logger
             )
             
             if result is None or 'error' in result:
@@ -613,44 +638,64 @@ def reprocess_failed_samples(
     logger.info(f"成功: {successful_count} 个")
     logger.info(f"失败: {failed_count} 个")
 
+def parse_target_images(images_arg):
+    """
+    解析目标图片参数
+    
+    Args:
+        images_arg: 可以是：
+            - 逗号分隔的图片文件名列表，如 "img1.jpg,img2.jpg,img3.jpg"
+            - 文件路径，文件中每行一个图片文件名
+    
+    Returns:
+        图片文件名列表，如果参数为None则返回None
+    """
+    if images_arg is None:
+        return None
+    
+    images_arg = images_arg.strip()
+    if not images_arg:
+        return None
+    
+    # 检查是否是文件路径
+    if os.path.exists(images_arg) and os.path.isfile(images_arg):
+        # 从文件读取
+        target_images = []
+        with open(images_arg, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#'):  # 忽略空行和注释
+                    target_images.append(line)
+        return target_images
+    else:
+        # 逗号分隔的列表
+        target_images = [img.strip() for img in images_arg.split(',') if img.strip()]
+        return target_images if target_images else None
+
 def main():
     global logger, tee_stdout, tee_stderr
     
-    # 创建输出目录
-    output_dir = Path(OUTPUT_DIR)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # 解析命令行参数
+    parser = argparse.ArgumentParser(description='CapMAS 图片 caption 生成脚本')
+    parser.add_argument(
+        '--images',
+        type=str,
+        default=None,
+        help='指定要处理的图片，可以是：1) 逗号分隔的图片文件名列表，如 "img1.jpg,img2.jpg"；2) 文件路径，文件中每行一个图片文件名'
+    )
+    args = parser.parse_args()
+    
+    # 解析目标图片列表
+    target_images = parse_target_images(args.images)
+    
+    # 创建日志目录
+    log_dir = Path(OUTPUT_JSON).parent
+    log_dir.mkdir(parents=True, exist_ok=True)
     
     # 初始化日志
-    log_file = output_dir / f"process_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    log_file = log_dir / f"capmas_gen_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
     logger, tee_stdout, tee_stderr = setup_logger(str(log_file))
     logger.info(f"日志文件: {log_file}")
-    
-    # 初始化 RefinementEngine
-    # logger.info(f"正在初始化 RefinementEngine...")
-    # logger.info(f"模型路径: {PRETRAINED}")
-    # logger.info(f"基础模型: {MODEL_BASE}")
-    
-    # refinement_engine = RefinementEngine(
-    #     model_path=PRETRAINED,
-    #     model_base=MODEL_BASE,
-    #     model_name=MODEL_NAME,
-    #     vision_tower_path=VISION_TOWER_PATH,
-    #     device=DEVICE,
-    #     max_steps=MAX_STEPS,
-    #     jitter_threshold=JITTER_THRESHOLD,
-    #     span_k=SPAN_K,
-    #     mask_expansion=MASK_EXPANSION,
-    #     global_suppress_radius=GLOBAL_SUPPRESS_RADIUS,
-    #     temp_dir=TEMP_DIR,
-    #     logger=logger  # 传递logger给RefinementEngine
-    # )
-    # logger.info("RefinementEngine 初始化完成")
-    
-    # 加载数据集
-    logger.info(f"正在加载数据集: {DATASET_PATH}")
-    df = pd.read_parquet(DATASET_PATH)
-    logger.info(f"数据集包含 {len(df)} 条数据")
-    logger.info(f"列名: {list(df.columns)}")
     
     # 检查图片目录
     image_dir_path = Path(IMAGE_DIR)
@@ -659,70 +704,105 @@ def main():
         raise FileNotFoundError(f"图片目录不存在: {IMAGE_DIR}")
     logger.info(f"图片目录: {IMAGE_DIR}")
     
-    # 保存完整的原始数据集（用于重新处理失败样本）
-    df_full = df.copy()
+    # 检查输出JSON文件
+    output_json_path = Path(OUTPUT_JSON)
+    output_json_path.parent.mkdir(parents=True, exist_ok=True)
     
-    logger.info(f"输出目录: {output_dir}")
+    # 读取或创建输出JSON文件
+    if output_json_path.exists():
+        logger.info(f"读取现有JSON文件: {OUTPUT_JSON}")
+        try:
+            with open(output_json_path, 'r', encoding='utf-8') as f:
+                output_data = json.load(f)
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.warning(f"JSON文件格式错误，将重新创建: {e}")
+            output_data = {}
+            with open(output_json_path, 'w', encoding='utf-8') as f:
+                json.dump(output_data, f, ensure_ascii=False)
+    else:
+        logger.info(f"创建新的JSON文件: {OUTPUT_JSON}")
+        output_data = {}
+        # 立即创建文件，确保子进程可以读取
+        with open(output_json_path, 'w', encoding='utf-8') as f:
+            json.dump(output_data, f, ensure_ascii=False)
     
-    # 检测并重新处理失败的样本
-    logger.info("\n" + "="*60)
-    logger.info("步骤 1: 检测失败的样本")
-    logger.info("="*60)
-    failed_samples = find_failed_samples(output_dir)
+    # 获取所有图片文件
+    image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif'}
+    all_image_files = []
+    for ext in image_extensions:
+        all_image_files.extend(image_dir_path.glob(f"*{ext}"))
+        all_image_files.extend(image_dir_path.glob(f"*{ext.upper()}"))
     
-    # if failed_samples:
-    #     logger.info(f"\n找到 {len(failed_samples)} 个失败的样本，开始重新处理...")
-    #     reprocess_failed_samples(
-    #         refinement_engine,
-    #         df_full, failed_samples, output_dir  # 使用完整数据集
-    #     )
-    # else:
-    #     logger.info("\n没有发现失败的样本，所有文件都包含有效的 generated_text")
+    # 按文件名排序
+    all_image_files = sorted(all_image_files, key=lambda x: x.name)
+    logger.info(f"找到 {len(all_image_files)} 张图片")
+    
+    # 筛选需要处理的图片
+    image_files_to_process = []
+    
+    # 如果指定了目标图片列表，只处理指定的图片
+    if target_images:
+        logger.info(f"指定了 {len(target_images)} 张目标图片")
+        # 创建文件名到路径的映射
+        image_path_map = {img_path.name: img_path for img_path in all_image_files}
+        
+        for target_filename in target_images:
+            target_filename = target_filename.strip()
+            if target_filename in image_path_map:
+                image_files_to_process.append((target_filename, image_path_map[target_filename]))
+                logger.info(f"  添加目标图片: {target_filename}")
+            else:
+                logger.warning(f"  警告: 目标图片不存在: {target_filename}")
+    else:
+        # 默认逻辑：只处理JSON中值为null的
+        for image_path in all_image_files:
+            filename = image_path.name
+            # 如果JSON中没有这个文件，或者值为null，则需要处理
+            if filename not in output_data or output_data[filename] is None:
+                image_files_to_process.append((filename, image_path))
+    
+    logger.info(f"需要处理的图片: {len(image_files_to_process)} 张")
     
     # 处理数据区间
-    if START_INDEX is None and END_INDEX is None:
-        logger.info("\n" + "="*60)
-        logger.info("步骤 2: 处理新数据（START_INDEX=None, END_INDEX=None，跳过新数据处理）")
-        logger.info("="*60)
-        logger.info("提示: 如果只想重新处理失败的样本，可以设置 START_INDEX=None, END_INDEX=None")
+    if START_INDEX is not None or END_INDEX is not None:
+        start_idx = START_INDEX if START_INDEX is not None else 0
+        end_idx = END_INDEX if END_INDEX is not None else len(image_files_to_process)
+        if start_idx >= len(image_files_to_process):
+            logger.warning(f"起始索引 {start_idx} 超出范围（共 {len(image_files_to_process)} 张），跳过处理")
+            return
+        end_idx = min(end_idx, len(image_files_to_process))
+        image_files_to_process = image_files_to_process[start_idx:end_idx]
+        logger.info(f"处理数据区间: [{start_idx}, {end_idx})，共 {len(image_files_to_process)} 张图片")
+    
+    if len(image_files_to_process) == 0:
+        logger.info("没有需要处理的图片")
         return
-    
-    # 根据索引区间筛选数据
-    start_idx = START_INDEX if START_INDEX is not None else 0
-    end_idx = END_INDEX if END_INDEX is not None else len(df)
-    
-    if start_idx >= len(df):
-        logger.warning(f"起始索引 {start_idx} 超出数据集范围（共 {len(df)} 条），跳过处理")
-        return
-    
-    end_idx = min(end_idx, len(df))
-    df = df.iloc[start_idx:end_idx]
-    logger.info(f"\n处理数据区间: [{start_idx}, {end_idx})，共 {len(df)} 条数据")
     
     logger.info("\n" + "="*60)
-    logger.info("步骤 2: 处理新数据（多GPU并行）")
+    logger.info("处理图片（多GPU并行）")
     logger.info("="*60)
     
     # 使用多GPU并行处理
-    logger.info(f"\n开始使用 {NUM_GPUS} 张GPU并行处理 {len(df)} 条数据...")
+    logger.info(f"\n开始使用 {NUM_GPUS} 张GPU并行处理 {len(image_files_to_process)} 张图片...")
     
-    # 将数据分割成NUM_GPUS份
-    chunk_size = len(df) // NUM_GPUS
+    # 将图片文件分割成NUM_GPUS份
+    chunk_size = len(image_files_to_process) // NUM_GPUS
     chunks = []
     for i in range(NUM_GPUS):
         start_idx = i * chunk_size
         if i == NUM_GPUS - 1:
             # 最后一份包含所有剩余数据
-            end_idx = len(df)
+            end_idx = len(image_files_to_process)
         else:
             end_idx = (i + 1) * chunk_size
-        chunk = df.iloc[start_idx:end_idx]
+        chunk = image_files_to_process[start_idx:end_idx]
         chunks.append(chunk)
-        logger.info(f"GPU {i}: 分配 {len(chunk)} 条数据 (索引 {start_idx} 到 {end_idx-1})")
+        logger.info(f"GPU {i}: 分配 {len(chunk)} 张图片 (索引 {start_idx} 到 {end_idx-1})")
     
-    # 创建结果队列
+    # 创建结果队列和锁
     manager = Manager()
     result_queue = manager.Queue()
+    json_lock = manager.Lock()  # 用于保护JSON文件写入
     
     # 创建进程列表
     processes = []
@@ -733,7 +813,7 @@ def main():
         if len(chunks[gpu_id]) > 0:
             p = Process(
                 target=process_data_chunk,
-                args=(gpu_id, chunks[gpu_id], output_dir, result_queue, log_file_base)
+                args=(gpu_id, chunks[gpu_id], OUTPUT_JSON, result_queue, log_file_base, json_lock)
             )
             p.start()
             processes.append(p)
@@ -783,11 +863,10 @@ def main():
     # 统计信息
     logger.info(f"\n" + "="*60)
     logger.info(f"所有GPU处理完成！")
-    logger.info(f"总计: {total_count} 条")
-    logger.info(f"成功: {total_successful} 条")
-    logger.info(f"失败: {total_failed} 条")
-    logger.info(f"结果已保存到目录: {output_dir}")
-    logger.info(f"每个样本的结果保存在单独的文件中，文件名格式: XXXXXX.json")
+    logger.info(f"总计: {total_count} 张")
+    logger.info(f"成功: {total_successful} 张")
+    logger.info(f"失败: {total_failed} 张")
+    logger.info(f"结果已保存到JSON文件: {OUTPUT_JSON}")
     logger.info(f"各GPU的日志文件: {log_file_base}_gpu0.log 到 {log_file_base}_gpu{NUM_GPUS-1}.log")
     logger.info("="*60)
     

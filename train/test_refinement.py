@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-简单的测试脚本 - 处理单条数据
+Simple test script for one sample.
 """
 import logging
 import sys
 import os
+from pathlib import Path
 
 # 添加路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -25,17 +26,24 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    """主函数"""
-    # 配置参数
-    model_path = "/data0/swz/LLaDA-VGR/train/exp/llada_vgr_lora_rank64"
-    model_base = "jiyatai/ReDiff"
+    repo_root = Path(__file__).resolve().parents[1]
+    workspace_root = repo_root.parent
+
+    model_path = os.environ.get("PRETRAINED_MODEL", str(repo_root / "train" / "exp" / "llada_v_lora_rank64_1227"))
+    model_base = "GSAI-ML/LLaDA-V"
     model_name = "llava_llada_lora"
     vision_tower_path = "google/siglip2-so400m-patch14-384"
     device = "cuda:0"
-    
-    # 测试数据
-    image_path = "/data0/swz/LLaDA-VGR/train/test2.jpg"
-    base_instruction = "Please describe the image in detail. Use less absolute directional descriptions."
+    IMAGE_INPUT_MODE = "both"
+    MASK_MODE = "span"
+    TOKEN_SELECTION_MODE = "jitter"
+    LOCAL_REFINEMENT_MODE = "crop"
+
+    image_path = os.environ.get(
+        "TEST_IMAGE",
+        str(workspace_root / "exp" / "MMHal-Bench" / "images" / "16189396430_4dce91a9d7_o.jpg"),
+    )
+    base_instruction = "Please describe the image in detail. Use less absolute directional descriptions. Do not repeat information."
     
     logger.info("=" * 60)
     logger.info("Starting Refinement Test")
@@ -51,13 +59,15 @@ def main():
             model_name=model_name,
             vision_tower_path=vision_tower_path,
             device=device,
-            max_steps=10,
-            jitter_threshold=0.30,
-            span_k=3,
+            max_steps=6,
+            jitter_threshold=0.35,
             mask_expansion=2,
-            global_suppress_radius=3,
             temp_dir="./cropped_image",
-            logger=logger
+            logger=logger,
+            image_input_mode=IMAGE_INPUT_MODE,
+            mask_mode=MASK_MODE,
+            token_selection_mode=TOKEN_SELECTION_MODE,
+            local_refinement_mode=LOCAL_REFINEMENT_MODE
         )
         
         # 执行细化

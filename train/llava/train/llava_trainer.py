@@ -11,12 +11,14 @@ from trl.trainer import DPOTrainer
 from trl.trainer.utils import DPODataCollatorWithPadding
 
 from transformers import Trainer
-from transformers.trainer import is_sagemaker_mp_enabled, get_parameter_names, has_length, ALL_LAYERNORM_LAYERS, logger, is_accelerate_available, is_datasets_available, GradientAccumulationPlugin
+from transformers.trainer import is_sagemaker_mp_enabled, get_parameter_names, has_length, logger, is_accelerate_available, is_datasets_available
 from transformers.trainer_utils import seed_worker
 from transformers.trainer_pt_utils import get_length_grouped_indices as get_length_grouped_indices_hf
 from transformers.trainer_pt_utils import AcceleratorConfig
+from transformers.pytorch_utils import ALL_LAYERNORM_LAYERS
 from typing import List, Optional
 from datetime import timedelta
+import inspect
 
 if is_accelerate_available():
     from accelerate import Accelerator, skip_first_batches, InitProcessGroupKwargs
@@ -25,6 +27,36 @@ if is_datasets_available():
     import datasets
 
 from llava.utils import rank0_print
+
+
+class CompatibleAccelerator:
+    """Wrapper for Accelerator to handle version compatibility issues."""
+    def __init__(self, accelerator):
+        self._accelerator = accelerator
+    
+    def unwrap_model(self, model, keep_torch_compile=False):
+        """Compatible unwrap_model that handles keep_torch_compile parameter."""
+        import inspect
+        try:
+            sig = inspect.signature(self._accelerator.unwrap_model)
+            if 'keep_torch_compile' in sig.parameters:
+                return self._accelerator.unwrap_model(model, keep_torch_compile=keep_torch_compile)
+            else:
+                return self._accelerator.unwrap_model(model)
+        except Exception:
+            # Fallback: try without the parameter
+            return self._accelerator.unwrap_model(model)
+    
+    def __getattr__(self, name):
+        """Delegate all other attributes and methods to the original accelerator."""
+        return getattr(self._accelerator, name)
+    
+    def __setattr__(self, name, value):
+        """Handle attribute setting, except for _accelerator."""
+        if name == '_accelerator':
+            super().__setattr__(name, value)
+        else:
+            setattr(self._accelerator, name, value)
 
 
 def maybe_zero_3(param, ignore_status=False, name=None):
@@ -248,15 +280,26 @@ class LLaVATrainer(Trainer):
         rank0_print("Setting NCCL timeout to INF to avoid running errors.")
 
         # create accelerator object
-        self.accelerator = Accelerator(
-            dispatch_batches=self.args.dispatch_batches, split_batches=self.args.split_batches, deepspeed_plugin=self.args.deepspeed_plugin, gradient_accumulation_plugin=gradient_accumulation_plugin, kwargs_handlers=[accelerator_kwargs]
+        dispatch_batches = getattr(self.args, "dispatch_batches", None)
+        split_batches = getattr(self.args, "split_batches", False)
+        accelerator = Accelerator(
+            dispatch_batches=dispatch_batches, split_batches=split_batches, deepspeed_plugin=self.args.deepspeed_plugin, gradient_accumulation_plugin=gradient_accumulation_plugin, kwargs_handlers=[accelerator_kwargs]
         )
+        # Wrap accelerator to handle version compatibility
+        self.accelerator = CompatibleAccelerator(accelerator)
         # some Trainer classes need to use `gather` instead of `gather_for_metrics`, thus we store a flag
         self.gather_function = self.accelerator.gather_for_metrics
 
         # deepspeed and accelerate flags covering both trainer args and accelerate launcher
         self.is_deepspeed_enabled = getattr(self.accelerator.state, "deepspeed_plugin", None) is not None
         self.is_fsdp_enabled = getattr(self.accelerator.state, "fsdp_plugin", None) is not None
+        # Check for tensor parallelism (TP) - typically False unless explicitly enabled
+        self.is_tp_enabled = (
+            getattr(self.accelerator.state, "tpu", False) or 
+            getattr(self.args, "tpu_num_cores", None) is not None or
+            (hasattr(self.accelerator.state, "tensor_parallel_plugin") and 
+             getattr(self.accelerator.state, "tensor_parallel_plugin", None) is not None)
+        )
 
         # post accelerator creation setup
         if self.is_fsdp_enabled:
@@ -346,8 +389,18 @@ class LLaVATrainer(Trainer):
         if not isinstance(train_dataset, torch.utils.data.IterableDataset):
             dataloader_params["sampler"] = self._get_train_sampler()
             dataloader_params["drop_last"] = self.args.dataloader_drop_last
-            dataloader_params["worker_init_fn"] = seed_worker
-            dataloader_params["prefetch_factor"] = self.args.dataloader_num_workers * 2 if self.args.dataloader_num_workers != 0 else None
+            # Create a compatible worker_init_fn for seed_worker
+            num_workers = self.args.dataloader_num_workers
+            rank = getattr(self.args, "local_rank", -1)
+            sig = inspect.signature(seed_worker)
+            if len(sig.parameters) > 1:  # New version with num_workers and rank
+                # Create a wrapper function that accepts worker_id and calls seed_worker with all required args
+                def worker_init_fn(worker_id):
+                    return seed_worker(worker_id, num_workers=num_workers, rank=rank)
+                dataloader_params["worker_init_fn"] = worker_init_fn
+            else:  # Old version with only worker_id
+                dataloader_params["worker_init_fn"] = seed_worker
+                dataloader_params["prefetch_factor"] = self.args.dataloader_num_workers * 2 if self.args.dataloader_num_workers != 0 else None
 
         if hasattr(self.args, "use_webdataset") and self.args.use_webdataset:
             dataloader = DataLoader(train_dataset, **dataloader_params)

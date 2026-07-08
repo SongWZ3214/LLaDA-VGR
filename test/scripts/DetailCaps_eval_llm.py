@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from typing import List, Dict, Any, Tuple, Literal
+import os
 from openai import OpenAI
 import pandas as pd
 from pydantic import BaseModel
@@ -15,38 +16,35 @@ from typing_extensions import TypedDict
 BASE64_RE = re.compile(r'^[A-Za-z0-9+/]+={0,2}$')
 
 class Inconsistency(TypedDict):
-    """不一致的短语"""
+    """Inconsistent phrase."""
     original_text: str
     corrected_text: str
 
 class FineGrainedPhrase(TypedDict):
-    """细粒度短语（正确但描述细粒度视觉细节）"""
+    """Fine-grained phrase (correct visual detail)."""
     original_text: str
     
 class ResultList(TypedDict):
     inconsistencies: List[Inconsistency]
     fine_grained_phrases: List[FineGrainedPhrase]
 
-# 初始化 OpenAI 客户端
-# 请确保设置了 OPENAI_API_KEY 环境变量
-OPENAI_API_KEY = "OPENAI_API_KEY"
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
-# 初始化 Gemini 客户端（如果可用）
-GEMINI_API_KEY = "GEMINI_API_KEY"  # 请在此处填入您的 Gemini API 密钥
-gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 def load_parquet_data(parquet_path: str) -> pd.DataFrame:
-    """加载 parquet 文件数据"""
+    """Load parquet."""
     df = pd.read_parquet(parquet_path)
     return df
 
 def evaluate_with_openai(image_base64: str, generated_text: str) -> Dict[str, Any]:
     """
-    使用 OpenAI API 评估生成文本与图像的一致性
-    
-    返回包含不一致短语和细粒度短语的字典
+    Evaluate caption-image consistency with OpenAI.
     """
+    if openai_client is None:
+        raise RuntimeError("Missing OPENAI_API_KEY environment variable.")
     
     prompt = f"""
 You are an expert editor with an extremely high attention to detail, specializing in image-text consistency.
@@ -149,18 +147,15 @@ Find all phrases in the caption that are factually *correct* and describe *fine-
         return result
         
     except Exception as e:
-        print(f"调用 OpenAI API 时出错: {e}")
+        print(f"OpenAI API error: {e}")
         return None
 
 def evaluate_with_gemini(image_base64: str, generated_text: str) -> Dict[str, Any]:
     """
-    使用 Google Gemini API 评估生成文本与图像的一致性
-    
-    返回包含不一致短语和细粒度短语的字典
+    Evaluate caption-image consistency with Gemini.
     """    
-    if not GEMINI_API_KEY:
-        print("错误: 未设置 GEMINI_API_KEY")
-        return None
+    if gemini_client is None:
+        raise RuntimeError("Missing GEMINI_API_KEY environment variable.")
     
     prompt = f"""
 You are an expert editor with an extremely high attention to detail, specializing in image-text consistency.
@@ -238,13 +233,10 @@ Caption to evaluate:
 """
     
     try:
-        # 解码 base64 图像
         image_data = base64.b64decode(image_base64)
                 
-        # 准备图像和文本        
         image = PIL.Image.open(io.BytesIO(image_data))
         
-        # 调用 Gemini API
         response = gemini_client.models.generate_content(
             model="gemini-2.5-flash",
             contents=[prompt, image],
@@ -258,26 +250,24 @@ Caption to evaluate:
         return response.parsed
         
     except Exception as e:
-        print(f"调用 Gemini API 时出错: {e}")
+        print(f"Gemini API error: {e}")
         import traceback
         traceback.print_exc()
         return None
 
 def load_all_json_files(directory: str) -> List[Tuple[int, dict, str]]:
     """
-    加载目录下所有 JSON 文件。
-    
     Returns:
         List of (index, data_dict, filepath) tuples, sorted by index
     """
     directory_path = Path(directory)
     if not directory_path.exists():
-        raise FileNotFoundError(f"目录不存在: {directory}")
+        raise FileNotFoundError(f"Directory does not exist: {directory}")
     
     files_data = []
     json_files = sorted(directory_path.glob("*.json"))
     
-    print(f"找到 {len(json_files)} 个 JSON 文件")
+    print(f"Found {len(json_files)} JSON files")
     
     for filepath in json_files:
         try:
@@ -286,11 +276,10 @@ def load_all_json_files(directory: str) -> List[Tuple[int, dict, str]]:
             
             index = data.get('index')
             if index is None:
-                # 尝试从文件名提取索引
                 try:
                     index = int(filepath.stem)
                 except ValueError:
-                    print(f"警告: 文件 {filepath} 没有有效的索引，跳过")
+                    print(f"Warning: file {filepath} has no valid index, skipping")
                     continue
             
             files_data.append((index, data, str(filepath)))
@@ -298,16 +287,13 @@ def load_all_json_files(directory: str) -> List[Tuple[int, dict, str]]:
             print(f"警告: 读取文件 {filepath} 时出错: {e}")
             continue
     
-    # 按索引排序
     files_data.sort(key=lambda x: x[0])
-    print(f"成功加载 {len(files_data)} 个文件")
+    print(f"Loaded {len(files_data)} files")
     
     return files_data
 
 def get_image_base64(df: pd.DataFrame, sample_index: int) -> str:
     """
-    从 parquet 文件中获取 base64 编码的图像
-    
     Args:
         df: parquet 数据框
         sample_index: 样本索引
@@ -347,7 +333,7 @@ def get_image_base64(df: pd.DataFrame, sample_index: int) -> str:
         
         return image_base64
     except Exception as e:
-        print(f"  获取图像数据时出错: {e}")
+        print(f"  Error reading image data: {e}")
         return None
 
 def process_evaluation(
@@ -358,8 +344,6 @@ def process_evaluation(
     api_provider: Literal["gpt", "gemini"] = "gpt"
 ):
     """
-    处理评估任务，读取目录下的各个文件，评估后将结果写回文件
-    
     Args:
         input_directory: 输入目录路径（包含各个 JSON 文件）
         parquet_file: DetailCaps-4870_refined_EN.parquet 文件路径
@@ -367,37 +351,39 @@ def process_evaluation(
         overwrite_existing: 如果为True，覆盖已处理的文件；如果为False，跳过已处理的文件
         api_provider: API 提供商，可选 "gpt" 或 "gemini"
     """
-    # 加载所有 JSON 文件
-    print("正在加载所有 JSON 文件...")
+    print("Loading JSON files...")
     files_data = load_all_json_files(input_directory)
     
     if not files_data:
-        print("错误: 没有找到任何有效的 JSON 文件")
+        print("Error: no valid JSON files found")
         return
     
     # 限制处理数量（如果指定）
     if max_samples is not None:
         files_data = files_data[:max_samples]
-        print(f"测试模式: 只处理前 {max_samples} 个样本")
+        print(f"Test mode: only processing first {max_samples} samples")
     
-    print("正在加载 parquet 文件...")
+    print("Loading parquet...")
     df = load_parquet_data(parquet_file)
     print(f"Parquet 文件包含 {len(df)} 行数据")
     
     # 显示覆盖模式
     if overwrite_existing:
-        print("模式: 覆盖已处理的文件")
+        print("Mode: overwrite existing files")
     else:
-        print("模式: 跳过已处理的文件")
+        print("Mode: skip existing files")
     
     # 显示 API 提供商
     if api_provider == "gemini":
-        if not GEMINI_API_KEY:
-            print("错误: 未设置 GEMINI_API_KEY")
+        if gemini_client is None:
+            print("Error: missing GEMINI_API_KEY")
             return
-        print(f"API 提供商: Gemini (gemini-1.5-pro)")
+        print("API provider: Gemini (gemini-2.5-flash)")
     else:
-        print(f"API 提供商: OpenAI (gpt-4o)")
+        if openai_client is None:
+            print("Error: missing OPENAI_API_KEY")
+            return
+        print("API provider: OpenAI (gpt-4o)")
     
     # 统计信息
     processed_count = 0
@@ -556,23 +542,15 @@ def process_evaluation(
     print(f"\n所有结果已写入各自的 JSON 文件")
 
 def main():
-    """主函数"""
-    input_directory = '/data2/swz/LLaDA-VGR/test/result/detailcaps_outputs'
-    parquet_file = '/data2/swz/LLaDA-VGR/test/data/DetailCaps-4870_refined_EN.parquet'
+    repo_root = Path(__file__).resolve().parents[2]
+    input_directory = str(Path(os.environ.get("INPUT_DIR", str(repo_root / "test" / "result" / "detailcaps_outputs"))))
+    parquet_file = str(Path(os.environ.get("PARQUET_FILE", str(repo_root / "test" / "data" / "DetailCaps-4870_refined_EN.parquet"))))
     
-    # 控制处理数据的数量，用于测试
-    # 设置为 None 表示处理所有数据，设置为数字表示只处理前 N 个样本
     MAX_SAMPLES = None  # 测试时设置为 5，正式运行时设置为 None
     
-    # 控制是否覆盖已处理的文件
-    # True: 覆盖已处理的文件（重新评估）
-    # False: 跳过已处理的文件（默认）
     OVERWRITE_EXISTING = False
     
-    # 选择 API 提供商
-    # "gpt": 使用 OpenAI GPT-4o
-    # "gemini": 使用 Google Gemini 1.5 Pro
-    API_PROVIDER = "gemini"  # 或 "gemini"
+    API_PROVIDER = os.environ.get("API_PROVIDER", "gemini")
 
     try:
         process_evaluation(

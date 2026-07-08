@@ -1,222 +1,378 @@
 import json
+import os
+import sys
+import argparse
+import subprocess
+import math
 from pathlib import Path
-from capture_metric.capture import CAPTURE
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
-def load_all_json_files(directory: str) -> List[Tuple[int, dict, str]]:
-    """
-    加载目录下所有 JSON 文件。
-    
-    Returns:
-        List of (index, data_dict, filepath) tuples, sorted by index
-    """
-    directory_path = Path(directory)
-    if not directory_path.exists():
-        raise FileNotFoundError(f"目录不存在: {directory}")
-    
+# ==========================================
+# 工具函数
+# ==========================================
+
+def load_json_files(file_paths: List[Path]) -> List[Tuple[int, dict, str]]:
+    """加载指定列表的 JSON 文件"""
     files_data = []
-    json_files = sorted(directory_path.glob("*.json"))
-    
-    print(f"找到 {len(json_files)} 个 JSON 文件")
-    
-    for filepath in json_files:
+    for filepath in file_paths:
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            
             index = data.get('index')
             if index is None:
-                # 尝试从文件名提取索引
                 try:
                     index = int(filepath.stem)
                 except ValueError:
-                    print(f"警告: 文件 {filepath} 没有有效的索引，跳过")
                     continue
-            
             files_data.append((index, data, str(filepath)))
-        except Exception as e:
-            print(f"警告: 读取文件 {filepath} 时出错: {e}")
+        except Exception:
             continue
-    
-    # 按索引排序
-    files_data.sort(key=lambda x: x[0])
-    print(f"成功加载 {len(files_data)} 个文件")
-    
     return files_data
 
-def prepare_evaluation_data(files_data: List[Tuple[int, dict, str]]) -> Tuple[Dict, Dict, List[Tuple[int, str]]]:
-    """
-    根据官方格式要求，准备 refs 和 preds 字典。
-    
-    Returns:
-        (refs, preds, file_mapping): refs和preds字典，以及(index, filepath)映射列表
-    """
+def prepare_data_for_capture(files_data):
+    """准备 CAPTURE 库需要的 refs 和 preds"""
     refs = {}
     preds = {}
-    file_mapping = []
+    file_mapping = [] # (index, original_filepath)
         
     for index, data, filepath in files_data:
-        # 检查是否有 token_details（可选，用于验证数据完整性）
-        td = data.get("token_details", [])
-        if not td and 'generated_text' not in data:
-            print(f"警告: 文件 {filepath} (index={index}) 没有有效数据，跳过")
-            continue
+        if 'generated_text' not in data: continue
         
-        # 准备 Ground Truth (refs) 字典
-        # refs 的 value 必须是一个列表
-        # 根据数据格式，Ground Truth 是 GT_Caption_GPT4O, GT_Caption_GPT4V, 和 GT_Caption_Gemini15Pro
         gt_captions = [
             data.get('GT_Caption_GPT4O'),
             data.get('GT_Caption_GPT4V'),
             data.get('GT_Caption_Gemini15Pro')
         ]
-        
-        # 过滤掉可能存在的 None 值
         valid_gt = [cap for cap in gt_captions if cap]
-        if not valid_gt:
-            print(f"警告: 文件 {filepath} (index={index}) 没有有效的 Ground Truth，跳过")
-            continue
+        if not valid_gt: continue
+        
+        generated_text = data.get('generated_text')
+        if not generated_text: continue
         
         refs[index] = valid_gt
-        
-        # 准备 Prediction (preds) 字典
-        # preds 的 value 必须是一个列表，只包含一个预测描述
-        generated_text = data.get('generated_text')
-        if not generated_text:
-            print(f"警告: 文件 {filepath} (index={index}) 没有生成的文本，跳过")
-            continue
-        
         preds[index] = [generated_text]
         file_mapping.append((index, filepath))
 
-    if not refs or not preds:
-        raise ValueError("未能成功准备任何评估数据，请检查您的文件路径和数据格式。")
-        
-    print(f"成功为 {len(refs)} 个样本准备了评估数据。")
     return refs, preds, file_mapping
 
+# ==========================================
+# Worker 逻辑 (子进程运行的部分)
+# ==========================================
 
-def main():
-    input_directory = '/data2/swz/LLaDA-VGR/test/result/detailcaps_outputs'
-    output_directory = input_directory  # 结果写回原目录
+def run_worker(gpu_id: str, temp_input_path: str, temp_output_path: str):
+    """
+    Worker 模式入口。
+    在一个独立的进程中运行，只负责计算分数。
+    """
+    # 1. 设置环境变量，只可见指定的 GPU
+    os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
     
-    # 控制处理数据的数量，用于测试
-    # 设置为 None 表示处理所有数据，设置为数字表示只处理前 N 个样本
-    MAX_SAMPLES = 1  # 测试时设置为 10，正式运行时设置为 None
-        
+    # 2. 只有在 Worker 里才导入重型库
     try:
-        # --- 1. 加载所有 JSON 文件 ---
-        print("正在加载所有 JSON 文件...")
-        files_data = load_all_json_files(input_directory)
+        import torch
+        # 必须先导入 torch 再 patch multiprocessing，或者反之，
+        # 但为了防止 capture 库内部提前引用，我们需要尽早 Patch
+    except ImportError:
+        print(f"[GPU {gpu_id}] 错误: 无法导入 torch")
+        sys.exit(1)
+
+    # --- 关键修正：完善的伪造 Pool 类 ---
+    class SynchronousPool:
+        """
+        用于欺骗 capture_metric，让它以为自己在多进程跑，实际上是在当前线程串行跑。
+        """
+        def __init__(self, *args, **kwargs): 
+            pass
         
-        if not files_data:
-            print("错误: 没有找到任何有效的 JSON 文件")
+        # 模拟上下文管理器 (with Pool() as pool:)
+        def __enter__(self):
+            return self
+        
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+        def apply_async(self, func, args=(), kwds=None, callback=None, error_callback=None):
+            if kwds is None: kwds = {}
+            # 立即执行函数
+            try:
+                res = func(*args, **kwds)
+                
+                # 返回一个假的 AsyncResult 对象
+                class DummyResult:
+                    def __init__(self, val): self._val = val
+                    def get(self, timeout=None): return self._val
+                    def wait(self, timeout=None): pass
+                    def ready(self): return True
+                    def successful(self): return True
+                
+                return DummyResult(res)
+            except Exception as e:
+                if error_callback: error_callback(e)
+                raise e
+
+        def close(self): pass
+        def join(self): pass
+        def terminate(self): pass
+
+    # 3. 进行 Monkey Patch
+    import multiprocessing
+    multiprocessing.Pool = SynchronousPool
+
+    # 4. 此时再导入 CAPTURE，确保它引用到的是被修改后的 Pool
+    try:
+        from capture_metric.capture import CAPTURE
+    except ImportError:
+        print(f"[GPU {gpu_id}] 错误: 无法导入 capture_metric")
+        sys.exit(1)
+
+    print(f"[GPU {gpu_id}] Worker 启动，正在加载任务文件: {temp_input_path}")
+    
+    # 5. 读取分配到的文件列表
+    with open(temp_input_path, 'r', encoding='utf-8') as f:
+        target_files = json.load(f)
+    
+    target_paths = [Path(p) for p in target_files]
+    files_data = load_json_files(target_paths)
+        
+    if not files_data:
+        print(f"[GPU {gpu_id}] 没有有效数据，退出。")
+        with open(temp_output_path, 'w') as f: 
+            json.dump({}, f)
             return
         
-        # 限制处理数量（如果指定）
-        if MAX_SAMPLES is not None:
-            files_data = files_data[:MAX_SAMPLES]
-            print(f"测试模式: 只处理前 {MAX_SAMPLES} 个样本")
+    # 6. 准备数据
+    refs, preds, file_mapping = prepare_data_for_capture(files_data)
+    print(f"[GPU {gpu_id}] 准备评估 {len(refs)} 个样本...")
+
+    # 7. 运行评估
+    evaluator = CAPTURE()
+    # compute_score 会调用 process_samples_multiprocessing
+    # 而 process_samples_multiprocessing 会调用我们伪造的 Pool
+    result = evaluator.compute_score(refs, preds, return_parse_results=True)
         
-        # --- 2. 准备评估数据 ---
-        print("正在准备 refs 和 preds 字典...")
-        refs, preds, file_mapping = prepare_evaluation_data(files_data)
-        
-        if not refs or not preds:
-            print("错误: 未能准备有效的评估数据")
-            return
-        
-        # --- 3. 计算 CAPTURE 分数 ---
-        print("正在初始化 CAPTURE 评估器...")
-        evaluator = CAPTURE()
-        
-        print(f"正在计算 {len(refs)} 个样本的分数... (这可能需要一些时间，因为需要加载T5和BERT模型)")
-        # CAPTURE.compute_score 返回 (overall_score, per_sample_scores) 或 (overall_score, per_sample_scores, parse_results)
-        result = evaluator.compute_score(refs, preds, return_parse_results=True)
-        
-        # 解包返回结果
-        if len(result) == 2:
-            overall_score, per_sample_scores = result
-            parse_results = None
-        elif len(result) == 3:
-            overall_score, per_sample_scores, parse_results = result
-            print(f"parse_results: {parse_results}")
-        else:
-            raise ValueError(f"意外的返回格式: {type(result)}")
-        
-        print(f"总体 CAPTURE 分数: {overall_score:.6f}")
-        print(f"每个样本的分数列表长度: {len(per_sample_scores)}")
-        
-        # --- 4. 将分数映射到各个样本并写回文件 ---
-        # 获取索引列表，顺序与 refs.keys() 一致（与 per_sample_scores 顺序一致）
-        indices_list = list(refs.keys())
-        
-        if len(per_sample_scores) != len(indices_list):
-            print(f"警告: 分数列表长度 ({len(per_sample_scores)}) 与样本数 ({len(indices_list)}) 不匹配")
-        
-        # 创建索引到分数的映射
-        index_to_score = {}
-        for idx, score in zip(indices_list, per_sample_scores):
-            index_to_score[idx] = float(score)
-        
-        # 创建索引到文件路径的映射
-        index_to_file = {idx: filepath for idx, filepath in file_mapping}
-        
-        # 将分数写回各自文件
-        updated_count = 0
-        for index, filepath in file_mapping:
-            if index in index_to_score:
+    if len(result) == 2:
+        _, per_sample_scores = result
+    else:
+        _, per_sample_scores, _ = result
+
+    # 8. 保存结果
+    output_scores = {}
+    indices = list(refs.keys())
+    for idx, score in zip(indices, per_sample_scores):
+        output_scores[idx] = float(score)
+    
+    print(f"[GPU {gpu_id}] 计算完成，保存结果到 {temp_output_path}")
+    with open(temp_output_path, 'w', encoding='utf-8') as f:
+        json.dump(output_scores, f)
+
+# ==========================================
+# Controller 逻辑 (主进程运行的部分)
+# ==========================================
+
+def run_controller(input_dir: str, num_gpus: int, max_samples: int = None, target_indices: List[int] = None):
+    """
+    主控模式入口。
+    
+    Args:
+        input_dir: 输入目录
+        num_gpus: GPU数量
+        max_samples: 最大样本数（用于测试）
+        target_indices: 要评估的特定索引列表，如果为None则评估所有文件
+    """
+    directory_path = Path(input_dir)
+    # 查找所有 json 文件
+    all_json_files = sorted([str(p) for p in directory_path.glob("*.json")])
+    
+    # 如果指定了目标索引，筛选对应的文件
+    if target_indices is not None:
+        target_indices_set = set(target_indices)
+        json_files = []
+        for json_file in all_json_files:
+            try:
+                # 尝试从文件内容读取index
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    idx = data.get('index')
+                    if idx is None:
+                        # 如果文件内容没有index，尝试从文件名提取
+                        idx = int(Path(json_file).stem)
+                    if idx in target_indices_set:
+                        json_files.append(json_file)
+            except (ValueError, json.JSONDecodeError, KeyError):
+                # 如果无法读取，尝试从文件名提取
                 try:
-                    # 读取原文件
-                    with open(filepath, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                    
-                    # 添加 CAPTURE 分数
-                    data['CAPTURE_score'] = index_to_score[index]
-                    # if parse_results is not None:
-                    #     data['CAPTURE_parse_results'] = parse_results[index]
-                    # 写回文件
-                    with open(filepath, 'w', encoding='utf-8') as f:
-                        json.dump(data, f, ensure_ascii=False, indent=2)
-                    
-                    updated_count += 1
-                except Exception as e:
-                    print(f"警告: 更新文件 {filepath} 时出错: {e}")
-        
-        print(f"成功更新 {updated_count} 个文件")
-        
-        # --- 5. 保存统计摘要 ---
-        valid_scores = list(index_to_score.values())
-        if valid_scores:
-            average_score = sum(valid_scores) / len(valid_scores)
-            print(f"\n平均 CAPTURE 分数: {average_score:.6f}")
-            print(f"有效样本数: {len(valid_scores)}")
-            
-            # 保存摘要到 txt 文件
-            summary_file = Path(output_directory) / "CAPTURE_summary.txt"
-            with open(summary_file, 'w', encoding='utf-8') as f:
-                f.write(f"CAPTURE 评估结果摘要\n")
-                f.write(f"{'='*50}\n\n")
-                f.write(f"总样本数: {len(files_data)}\n")
-                f.write(f"有效评估样本数: {len(valid_scores)}\n")
-                f.write(f"总体 CAPTURE 分数: {overall_score:.6f}\n")
-                f.write(f"平均 CAPTURE 分数: {average_score:.6f}\n")
-                f.write(f"最高分数: {max(valid_scores):.6f}\n")
-                f.write(f"最低分数: {min(valid_scores):.6f}\n")
-                f.write(f"\n详细分数已写入各个 JSON 文件的 'CAPTURE_score' 字段\n")
-            
-            print(f"\n评估摘要已保存到: {summary_file}")
+                    idx = int(Path(json_file).stem)
+                    if idx in target_indices_set:
+                        json_files.append(json_file)
+                except ValueError:
+                    continue
+        print(f"[Controller] 指定了 {len(target_indices)} 个目标索引，找到 {len(json_files)} 个匹配的文件")
+    else:
+        json_files = all_json_files
+    
+    if max_samples:
+        json_files = json_files[:max_samples]
+        print(f"[Controller] 测试模式: 仅处理前 {max_samples} 个文件")
 
-        print("\n--- 评估完成 ---")
+    total_files = len(json_files)
+    if total_files == 0:
+        print("没有找到 JSON 文件")
+        return
 
-    except FileNotFoundError as e:
-        print(f"错误：找不到文件或目录: {e}")
-    except Exception as e:
-        print(f"发生错误：{e}")
-        import traceback
-        traceback.print_exc()
+    # 1. 切分任务
+    print(f"[Controller] 将 {total_files} 个文件分配给 {num_gpus} 个 GPU...")
+    chunk_size = math.ceil(total_files / num_gpus)
+    chunks = [json_files[i:i + chunk_size] for i in range(0, total_files, chunk_size)]
+    while len(chunks) < num_gpus: chunks.append([])
+
+    # 2. 创建临时目录
+    temp_dir = Path("./temp_capture_tasks")
+    temp_dir.mkdir(exist_ok=True)
+    
+    workers = []
+    current_script = sys.argv[0]
+    
+    # 3. 启动子进程
+    for rank in range(num_gpus):
+        if not chunks[rank]: continue
+        
+        task_file = temp_dir / f"task_gpu_{rank}.json"
+        result_file = temp_dir / f"result_gpu_{rank}.json"
+        
+        with open(task_file, 'w', encoding='utf-8') as f:
+            json.dump(chunks[rank], f)
+        
+        cmd = [
+            sys.executable, current_script,
+            '--worker',
+            '--gpu', str(rank),
+            '--task_file', str(task_file),
+            '--result_file', str(result_file)
+        ]
+        
+        print(f"[Controller] 启动 GPU {rank}...")
+        p = subprocess.Popen(cmd)
+        workers.append(p)
+
+    # 4. 等待完成
+    print("[Controller] 等待所有 Worker 完成...")
+    exit_codes = [p.wait() for p in workers]
+    
+    if any(code != 0 for code in exit_codes):
+        print("警告: 有部分 Worker 异常退出，请检查上方报错信息。")
+        
+    # 5. 收集结果
+    print("[Controller] 正在合并结果并写入原文件...")
+    updated_count = 0
+    new_scores = []  # 本次新评估的分数
+
+    for rank in range(num_gpus):
+        result_file = temp_dir / f"result_gpu_{rank}.json"
+        if not result_file.exists(): continue
+        
+        try:
+            with open(result_file, 'r') as f:
+                scores = json.load(f) # {index_str: score}
+            
+            # 重新建立 filepath 映射
+            chunk_files = chunks[rank]
+            file_map = {}
+            for fp in chunk_files:
+                try:
+                    with open(fp, 'r') as f: d = json.load(f)
+                    idx = d.get('index', int(Path(fp).stem))
+                    file_map[str(idx)] = fp
+                except: pass
+            
+            # 更新
+            for idx_str, score in scores.items():
+                if idx_str in file_map:
+                    fp = file_map[idx_str]
+                    try:
+                        with open(fp, 'r', encoding='utf-8') as f: d = json.load(f)
+                        d['CAPTURE_score'] = score
+                        with open(fp, 'w', encoding='utf-8') as f: 
+                            json.dump(d, f, ensure_ascii=False, indent=2)
+                        updated_count += 1
+                        new_scores.append(score)
+                    except: pass
+        except Exception as e:
+            print(f"读取结果文件 {result_file} 失败: {e}")
+
+    # 6. 重新计算所有文件的总平均分
+    print("[Controller] 正在重新计算所有文件的总平均分...")
+    all_scores = []
+    all_json_files = sorted([p for p in directory_path.glob("*.json")])
+    
+    for json_file in all_json_files:
+        try:
+            with open(json_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if 'CAPTURE_score' in data:
+                score = data['CAPTURE_score']
+                if isinstance(score, (int, float)):
+                    all_scores.append(float(score))
+        except Exception as e:
+                continue
+
+    # 清理临时目录 (根据需要取消注释)
+    # import shutil
+    # shutil.rmtree(temp_dir)
+    
+    if new_scores:
+        new_avg = sum(new_scores) / len(new_scores)
+        print(f"\n[完成] 成功更新 {updated_count} 个文件。")
+        print(f"本次评估的平均 CAPTURE 分数: {new_avg:.6f}")
+    
+    if all_scores:
+        total_avg = sum(all_scores) / len(all_scores)
+        print(f"所有文件的总平均 CAPTURE 分数: {total_avg:.6f} (共 {len(all_scores)} 个文件)")
+        
+        summary_path = Path(input_dir) / "CAPTURE_summary_subprocess.txt"
+        with open(summary_path, 'w') as f:
+            f.write(f"Average: {total_avg:.6f}\nCount: {len(all_scores)}\n")
+            if new_scores:
+                f.write(f"New Evaluated: {len(new_scores)}\n")
+                f.write(f"New Average: {new_avg:.6f}\n")
+
+# ==========================================
+# 主入口
+# ==========================================
 
 if __name__ == "__main__":
-    # 确保您已经安装了 capture_metric
-    # pip3 install capture_metric
-    main()
+    parser = argparse.ArgumentParser()
+    # 这里的默认路径根据你的实际路径修改
+    parser.add_argument("--dir", type=str, default='/data0/swz/exp/DetailCaps/result/llada_vgr_0105_mask0')
+    parser.add_argument("--num_gpus", type=int, default=4)
+    parser.add_argument("--max_samples", type=int, default=None, help="测试时限制样本数")
+    parser.add_argument("--indices", type=str, default=None, 
+                       help="要评估的样本索引，可以是逗号分隔的字符串（如 '0,1,2'）或文件路径（每行一个索引）")
+    
+    parser.add_argument("--worker", action='store_true', help="Internal use only")
+    parser.add_argument("--gpu", type=str, default="0")
+    parser.add_argument("--task_file", type=str)
+    parser.add_argument("--result_file", type=str)
+    
+    args = parser.parse_args()
+    
+    if args.worker:
+        run_worker(args.gpu, args.task_file, args.result_file)
+    else:
+        # 解析 indices 参数
+        target_indices = None
+        if args.indices:
+            if Path(args.indices).exists():
+                # 从文件读取索引
+                with open(args.indices, 'r') as f:
+                    target_indices = [int(line.strip()) for line in f if line.strip().isdigit()]
+                print(f"[Controller] 从文件读取 {len(target_indices)} 个索引: {args.indices}")
+            else:
+                # 从逗号分隔的字符串解析
+                try:
+                    target_indices = [int(x.strip()) for x in args.indices.split(',') if x.strip().isdigit()]
+                    print(f"[Controller] 从参数解析 {len(target_indices)} 个索引")
+                except ValueError:
+                    print(f"[Controller] 警告: 无法解析索引参数 '{args.indices}'，将评估所有文件")
+                    target_indices = None
+        
+        run_controller(args.dir, args.num_gpus, args.max_samples, target_indices)

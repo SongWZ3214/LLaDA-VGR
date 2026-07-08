@@ -16,12 +16,78 @@
 import os
 import warnings
 import shutil
+import time
+import random
 
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig, BitsAndBytesConfig
 import torch
 from llava.model import *
 from llava.constants import DEFAULT_IMAGE_PATCH_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
 from llava.utils import rank0_print
+
+
+def _load_tokenizer_with_retry(model_path_or_name, use_fast=False, max_retries=3, base_delay=2):
+    """
+    加载 tokenizer，带重试机制和延迟，避免 HuggingFace API 速率限制
+    
+    Args:
+        model_path_or_name: 模型路径或名称
+        use_fast: 是否使用快速 tokenizer
+        max_retries: 最大重试次数
+        base_delay: 基础延迟（秒），每次重试会增加随机延迟
+    """
+    import os
+    from huggingface_hub.errors import HfHubHTTPError
+    
+    # 添加随机延迟，避免多个进程同时访问
+    delay = base_delay + random.uniform(0, 2)
+    time.sleep(delay)
+    
+    for attempt in range(max_retries):
+        try:
+            # 首先尝试使用本地缓存
+            if attempt == 0:
+                try:
+                    tokenizer = AutoTokenizer.from_pretrained(
+                        model_path_or_name, 
+                        use_fast=use_fast,
+                        local_files_only=True
+                    )
+                    return tokenizer
+                except (OSError, ValueError):
+                    # 如果本地没有缓存，继续尝试在线下载
+                    pass
+            
+            # 尝试在线下载
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_path_or_name, 
+                use_fast=use_fast,
+                local_files_only=False
+            )
+            return tokenizer
+            
+        except HfHubHTTPError as e:
+            if e.response.status_code == 429:  # Too Many Requests
+                if attempt < max_retries - 1:
+                    # 指数退避 + 随机抖动
+                    wait_time = base_delay * (2 ** attempt) + random.uniform(0, 3)
+                    rank0_print(f"Rate limited. Waiting {wait_time:.1f}s before retry {attempt + 1}/{max_retries}...")
+                    time.sleep(wait_time)
+                else:
+                    rank0_print(f"Failed to load tokenizer after {max_retries} attempts due to rate limiting.")
+                    raise
+            else:
+                # 其他错误直接抛出
+                raise
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait_time = base_delay * (2 ** attempt) + random.uniform(0, 2)
+                rank0_print(f"Error loading tokenizer: {e}. Retrying in {wait_time:.1f}s...")
+                time.sleep(wait_time)
+            else:
+                raise
+    
+    raise RuntimeError(f"Failed to load tokenizer after {max_retries} attempts")
 
 
 def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, load_4bit=False, device_map="auto", torch_dtype="float16",attn_implementation="flash_attention_2", customized_config=None, overwrite_config=None, **kwargs):
@@ -57,37 +123,37 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
             )
         if "lora" in model_name.lower() and model_base is not None:
             lora_cfg_pretrained = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
-            tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+            tokenizer = _load_tokenizer_with_retry(model_base, use_fast=False)
             rank0_print("Loading LLaVA from base model...")
             if "mixtral" in model_name.lower():
                 from llava.model.language_model.llava_mixtral import LlavaMixtralConfig
 
                 lora_cfg_pretrained = LlavaMixtralConfig.from_pretrained(model_path)
-                tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+                tokenizer = _load_tokenizer_with_retry(model_base, use_fast=False)
                 model = LlavaMixtralForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=lora_cfg_pretrained, attn_implementation=attn_implementation, **kwargs)
             elif "mistral" in model_name.lower():
                 from llava.model.language_model.llava_mistral import LlavaMistralConfig
 
                 lora_cfg_pretrained = LlavaMistralConfig.from_pretrained(model_path)
-                tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+                tokenizer = _load_tokenizer_with_retry(model_base, use_fast=False)
                 model = LlavaMistralForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=lora_cfg_pretrained, attn_implementation=attn_implementation, **kwargs)
             elif "gemma" in model_name.lower():
                 from llava.model.language_model.llava_gemma import LlavaGemmaConfig
 
                 lora_cfg_pretrained = LlavaGemmaConfig.from_pretrained(model_path)
-                tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+                tokenizer = _load_tokenizer_with_retry(model_base, use_fast=False)
                 model = LlavaGemmaForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=lora_cfg_pretrained, attn_implementation=attn_implementation, **kwargs)
             elif "llada" in model_name.lower():
                 from llava.model.language_model.llava_llada import LlavaLLaDAConfig
 
                 lora_cfg_pretrained = LlavaLLaDAConfig.from_pretrained(model_path, trust_remote_code=True)
-                tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+                tokenizer = _load_tokenizer_with_retry(model_base, use_fast=False)
                 model = LlavaLLaDAModelLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=lora_cfg_pretrained, attn_implementation=attn_implementation, trust_remote_code=True, **kwargs)
             else:
                 from llava.model.language_model.llava_llama import LlavaConfig
 
                 lora_cfg_pretrained = LlavaConfig.from_pretrained(model_path)
-                tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+                tokenizer = _load_tokenizer_with_retry(model_base, use_fast=False)
                 model = LlavaLlamaForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=lora_cfg_pretrained, attn_implementation=attn_implementation, **kwargs)
 
             token_num, tokem_dim = model.lm_head.out_features, model.lm_head.in_features
@@ -106,31 +172,72 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
                     cache_file = hf_hub_download(repo_id=repo_id, filename=filename, subfolder=subfolder)
                     return torch.load(cache_file, map_location="cpu")
 
-                non_lora_trainables = load_from_hf(model_path, "non_lora_trainables.bin")
+                # non_lora_trainables = load_from_hf(model_path, "non_lora_trainables.bin")
+                print("Notice: 'non_lora_trainables.bin' not found. Assuming weights are merged in adapter_model.bin/safetensors.")
+                non_lora_trainables = {}
+            # 处理键名：去掉 base_model. 前缀
             non_lora_trainables = {(k[11:] if k.startswith("base_model.") else k): v for k, v in non_lora_trainables.items()}
+            # 处理键名：去掉 model. 前缀（如果存在）
             if any(k.startswith("model.model.") for k in non_lora_trainables):
                 non_lora_trainables = {(k[6:] if k.startswith("model.") else k): v for k, v in non_lora_trainables.items()}
-            model.load_state_dict(non_lora_trainables, strict=False)
+            # 处理 mm_projector 的键名：将 modules_to_save.default 和 original_module 映射到正确的路径
+            processed_non_lora = {}
+            for k, v in non_lora_trainables.items():
+                if "mm_projector.modules_to_save.default" in k:
+                    # 将 mm_projector.modules_to_save.default.X 映射到 mm_projector.X
+                    new_k = k.replace("mm_projector.modules_to_save.default", "mm_projector")
+                    processed_non_lora[new_k] = v
+                elif "mm_projector.original_module" in k:
+                    # 将 mm_projector.original_module.X 映射到 mm_projector.X
+                    new_k = k.replace("mm_projector.original_module", "mm_projector")
+                    processed_non_lora[new_k] = v
+                else:
+                    processed_non_lora[k] = v
+            model.load_state_dict(processed_non_lora, strict=False)
 
             from peft import PeftModel
+            import json
+            import shutil
 
             rank0_print("Loading LoRA weights...")
-            model = PeftModel.from_pretrained(model, model_path, trust_remote_code=True)
+            # 临时修改适配器配置，移除 modules_to_save 以避免加载时的键名检查错误
+            adapter_config_path = os.path.join(model_path, "adapter_config.json")
+            backup_config_path = adapter_config_path + ".backup"
+            if os.path.exists(adapter_config_path):
+                # 备份原始配置
+                shutil.copy(adapter_config_path, backup_config_path)
+                # 读取并修改配置
+                with open(adapter_config_path, 'r') as f:
+                    adapter_config = json.load(f)
+                original_modules_to_save = adapter_config.get("modules_to_save", [])
+                # 临时移除 modules_to_save
+                if "mm_projector" in original_modules_to_save:
+                    adapter_config["modules_to_save"] = []
+                    with open(adapter_config_path, 'w') as f:
+                        json.dump(adapter_config, f, indent=2)
+            
+            try:
+                model = PeftModel.from_pretrained(model, model_path, trust_remote_code=True)
+            finally:
+                # 恢复原始配置
+                if os.path.exists(backup_config_path):
+                    shutil.move(backup_config_path, adapter_config_path)
+            
             rank0_print("Merging LoRA weights...")
             model = model.merge_and_unload()
             rank0_print("Model is loaded...")
         elif model_base is not None:  # this may be mm projector only, loading projector with preset language mdoel
             rank0_print(f"Loading LLaVA from base model {model_base}...")
             if "mixtral" in model_name.lower():
-                tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+                tokenizer = _load_tokenizer_with_retry(model_base, use_fast=False)
                 cfg_pretrained = AutoConfig.from_pretrained(model_path)
                 model = LlavaMixtralForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=cfg_pretrained, attn_implementation=attn_implementation, **kwargs)
             elif "mistral" in model_name.lower() or "zephyr" in model_name.lower():
-                tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+                tokenizer = _load_tokenizer_with_retry(model_base, use_fast=False)
                 cfg_pretrained = AutoConfig.from_pretrained(model_path)
                 model = LlavaMistralForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=cfg_pretrained, attn_implementation=attn_implementation, **kwargs)
             elif "gemma" in model_name.lower():
-                tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+                tokenizer = _load_tokenizer_with_retry(model_base, use_fast=False)
                 cfg_pretrained = AutoConfig.from_pretrained(model_path)
                 model = LlavaGemmaForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=cfg_pretrained, attn_implementation=attn_implementation, **kwargs)
             elif (
@@ -152,7 +259,7 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
                 else:
                     llava_cfg = customized_config
 
-                tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+                tokenizer = _load_tokenizer_with_retry(model_base, use_fast=False)
                 llava_cfg = LlavaConfig.from_pretrained(model_path)
                 model = LlavaLlamaForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=llava_cfg, **kwargs)
             elif "llada" in model_name.lower():
@@ -169,7 +276,7 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
                     for k, v in overwrite_config.items():
                         setattr(llada_cfg, k, v)
 
-                tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+                tokenizer = _load_tokenizer_with_retry(model_base, use_fast=False)
                 llada_cfg = LlavaLLaDAConfig.from_pretrained(model_path, trust_remote_code=True)
                 model = LlavaLLaDAModelLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=llada_cfg, trust_remote_code=True, **kwargs)
             else:
@@ -296,7 +403,7 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
             # PEFT model
             from peft import PeftModel
 
-            tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+            tokenizer = _load_tokenizer_with_retry(model_base, use_fast=False)
             model = AutoModelForCausalLM.from_pretrained(model_base, torch_dtype=torch.float16, low_cpu_mem_usage=True, device_map="auto")
             print(f"Loading LoRA weights from {model_path}")
             model = PeftModel.from_pretrained(model, model_path)
